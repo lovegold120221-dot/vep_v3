@@ -2038,6 +2038,7 @@ function BeatriceAgent({
   const fillerCheckIntervalRef = useRef<any>(null);
   const lastAudioSendTimeRef = useRef<number>(0);
   const isAgentSpeakingRef = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { 
     isMutedRef.current = isMuted; 
@@ -2050,6 +2051,12 @@ function BeatriceAgent({
   useEffect(() => { 
     isAgentSpeakingRef.current = isAgentSpeaking; 
   }, [isAgentSpeaking]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [historyMsgs]);
 
   useEffect(() => {
     let wakeLock: any = null;
@@ -3986,6 +3993,7 @@ Tasks:
                       No Office History Yet
                     </div> 
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
                 
                 <form 
