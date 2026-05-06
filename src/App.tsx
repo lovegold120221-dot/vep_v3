@@ -4055,15 +4055,6 @@ Tasks:
                       <Paperclip className="h-4 w-4" />
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => { setIsVoiceActive(true); setShowSidebar(false); }}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
-                      aria-label="Activate Voice Mode"
-                    >
-                      <Mic className="h-4 w-4" />
-                    </button>
-
                     <input
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
