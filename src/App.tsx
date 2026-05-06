@@ -1108,7 +1108,7 @@ function LimeVoiceOrb({
     levelRef.current = speakerLevel;
     bandsRef.current = speakerBands;
     activeRef.current = isActive;
-    targetActiveRef.current = isActive ? 1 : 0;
+    targetActiveRef.current = 1; // Always show orb
     if (!isActive) speakingRef.current = false;
   }, [isActive, isAgentSpeaking, speakerBands, speakerLevel]);
 
