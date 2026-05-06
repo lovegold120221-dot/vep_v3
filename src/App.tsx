@@ -3933,24 +3933,24 @@ Tasks:
               className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm" 
             />
             
-<motion.div 
+<motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-0 z-[101] flex w-full flex-col border-r border-white/10 bg-[#0A0A0B] shadow-2xl sm:bottom-0 sm:top-auto sm:left-0 sm:w-96 sm:max-w-[88vw] sm:rounded-t-2xl"
             >
-              <div className="flex items-center justify-between border-b border-white/10 p-6">
-                <div>
-                  <h2 className="text-sm font-bold uppercase tracking-widest text-white">Office History</h2>
-                  <p className="mt-1 text-[10px] uppercase tracking-widest text-zinc-500">Saved conversation records</p>
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-lime-300" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
                 </div>
-                 <button 
-                   onClick={() => setShowSidebar(false)} 
-                   className="-mr-2 rounded-xl p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
-                   aria-label="Close Sidebar"
-                 >
-                  <X className="h-5 w-5" />
+                <button
+                  onClick={() => setShowSidebar(false)}
+                  className="-mr-2 rounded-xl p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
+                  aria-label="Close Sidebar"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
@@ -3958,14 +3958,8 @@ Tasks:
                 <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-lime-300/5 to-transparent px-4 py-3">
                   <div className="flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-lime-300" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chat Mode</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
                   </div>
-                  {isActive && (
-                    <span className="flex items-center gap-1.5 rounded-full border border-lime-300/30 bg-lime-300/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-lime-300">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-lime-300" />
-                      Active
-                    </span>
-                  )}
                 </div>
 
                 <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-3">
