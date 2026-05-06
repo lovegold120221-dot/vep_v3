@@ -3701,7 +3701,9 @@ Tasks:
             }`}
             aria-label="Toggle Voice Mode"
           >
-            <Mic className={`h-4 w-4 ${isVoiceActive ? 'text-lime-300' : ''}`} />
+            <span className={`font-mono text-[14px] tracking-widest ${isVoiceActive ? 'text-lime-300' : ''}`}>
+              ။‖‖‖။
+            </span>
             <span className="hidden sm:inline">Voice</span>
           </button>
 
