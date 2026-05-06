@@ -57,7 +57,8 @@ import {
   Code2,
   Database,
   Trash2,
-  Globe
+  Globe,
+  Settings
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -98,6 +99,8 @@ interface AgentSettings {
   selectedVoice: string;
   selectedLanguage: string;
   knowledgeBase: string;
+  autoExecuteTools: boolean;
+  saveConversationHistory: boolean;
 }
 
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
@@ -277,6 +280,8 @@ const DEFAULT_SETTINGS: AgentSettings = {
   selectedVoice: 'Aoede',
   selectedLanguage: 'English',
   knowledgeBase: '',
+  autoExecuteTools: false,
+  saveConversationHistory: true,
 };
 
 const GOOGLE_SERVICE_TOOLS =[
@@ -2105,14 +2110,35 @@ function BeatriceAgent({
   },[settings.selectedVoice]);
 
   const saveMessage = (role: 'user' | 'model', text: string, extra?: Partial<ChatMessage>) => {
-    const clean = text.trim(); 
+    const clean = text.trim();
     if (!clean && !extra?.fileDataUrl) return;
-    
-    try { 
-      const msgRef = push(ref(rtdb, 'users/' + user.uid + '/messages')); 
-      set(msgRef, { role, text: clean, timestamp: Date.now(), ...extra }); 
-    } catch (e) { 
-      console.error(e); 
+
+    const msgData = { role, text: clean, timestamp: Date.now(), ...extra };
+
+    try {
+      const msgRef = push(ref(rtdb, 'users/' + user.uid + '/messages'));
+      set(msgRef, msgData);
+    } catch (e) {
+      console.error(e);
+    }
+
+    if (settings.saveConversationHistory) {
+      saveToSupabaseMemory(user.uid, user.email || '', role, clean).catch(console.error);
+    }
+  };
+
+  const saveToSupabaseMemory = async (uid: string, email: string, role: 'user' | 'model', text: string) => {
+    try {
+      const { error } = await supabase.from('conversation_memory').insert({
+        user_id: uid,
+        user_email: email,
+        role,
+        message: text,
+        created_at: new Date().toISOString(),
+      });
+      if (error) console.error('Supabase save error:', error);
+    } catch (e) {
+      console.error('Supabase save failed:', e);
     }
   };
 
@@ -2942,8 +2968,9 @@ function BeatriceAgent({
         `For HTML/CSS/JS artifacts, include all CSS in <style> and all JS in <script>. Make it directly openable. For documents, include print CSS and a print button. For Three.js, load Three.js from a CDN and keep everything in one HTML file.`,
         
         `=== TOOL EXECUTION & CONFIRMATION RULES ===`,
-        `You MUST NEVER call tools automatically for external actions without confirming first. Tools may only be used when the user explicitly asks for an external action.`,
-        `Before executing any tool, you must ask the user for confirmation in plain human language. Say exactly what you are about to do and ask for a 'Yes' or 'No'.`,
+        settings.autoExecuteTools
+          ? `Auto-execute mode is ENABLED. When the user asks for an action (like sending an email, creating a calendar event, searching files, etc.), execute the appropriate tool directly without asking for confirmation. Report the result naturally after execution.`
+          : `Manual confirmation mode. You MUST ask for confirmation before executing any tool that makes external changes: sending emails, creating calendar events, uploading files, sending messages, etc. Say exactly what you are about to do and ask 'Yes' or 'No'.`,
         `Do not query tools unless clearly requested.`,
         
         `=== TRUTHFULNESS RULES (NON-NEGOTIABLE) ===`,
@@ -4126,11 +4153,50 @@ Tasks:
                     value={settings.personality} 
                     onChange={(e) => setSettings(s => ({ ...s, personality: e.target.value }))} 
                     className="min-h-[140px] w-full resize-y rounded-xl border border-white/10 bg-[#0A0A0B] p-4 font-mono text-xs leading-relaxed text-zinc-300 outline-none transition-all focus:border-lime-300/50 focus:ring-1 focus:ring-lime-300/50" 
-                    placeholder="Describe how the agent should behave..." 
+                    placeholder="Describe how the agent should behave..."
                   />
                   <p className="text-[10px] leading-relaxed text-zinc-600">
                     The hidden office-behavior prompt stays applied behind this editable persona.
                   </p>
+                </div>
+
+                <div className="flex flex-col space-y-3 pt-6 border-t border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-lime-300" />
+                    <label className="text-sm font-bold uppercase tracking-widest text-white">Agent Behavior</label>
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <input
+                      id="autoExecute"
+                      type="checkbox"
+                      checked={settings.autoExecuteTools}
+                      onChange={(e) => setSettings(s => ({ ...s, autoExecuteTools: e.target.checked }))}
+                      className="mt-0.5 h-4 w-4 accent-lime-300"
+                    />
+                    <label htmlFor="autoExecute" className="flex flex-col gap-1 cursor-pointer">
+                      <span className="text-sm font-medium text-white">Auto-execute Google tools</span>
+                      <span className="text-[10px] leading-relaxed text-zinc-500">
+                        Skip confirmation prompts. Agent will send emails, create events, and modify files directly when you ask.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <input
+                      id="saveHistory"
+                      type="checkbox"
+                      checked={settings.saveConversationHistory}
+                      onChange={(e) => setSettings(s => ({ ...s, saveConversationHistory: e.target.checked }))}
+                      className="mt-0.5 h-4 w-4 accent-lime-300"
+                    />
+                    <label htmlFor="saveHistory" className="flex flex-col gap-1 cursor-pointer">
+                      <span className="text-sm font-medium text-white">Save conversation history</span>
+                      <span className="text-[10px] leading-relaxed text-zinc-500">
+                        All conversations are stored as your personal knowledge base in Supabase for long-term memory across sessions.
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex flex-col space-y-3 pt-6 border-t border-white/10">
