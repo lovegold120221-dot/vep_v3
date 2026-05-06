@@ -1103,12 +1103,15 @@ function LimeVoiceOrb({
   const bandsRef = useRef<number[]>(Array(20).fill(0));
   const activeRef = useRef(false);
   const speakingRef = useRef(false);
+  const smoothActiveRef = useRef(0);
+  const targetActiveRef = useRef(0);
 
   useEffect(() => {
     levelRef.current = speakerLevel;
     bandsRef.current = speakerBands;
     activeRef.current = isActive;
-    speakingRef.current = isAgentSpeaking;
+    targetActiveRef.current = isActive ? 1 : 0;
+    if (!isActive) speakingRef.current = false;
   }, [isActive, isAgentSpeaking, speakerBands, speakerLevel]);
 
   useEffect(() => {
@@ -1137,21 +1140,20 @@ function LimeVoiceOrb({
       };
     };
 
-    const makeOrbPath = (cx: number, cy: number, radius: number, pulse: number, time: number) => {
+    const makeOrbPath = (cx: number, cy: number, radius: number, pulse: number, time: number, smoothA: number) => {
       const path = new Path2D();
-      const points: Array<{ x: number; y: number }> =[];
       const bands = bandsRef.current.length ? bandsRef.current : Array(20).fill(0);
-      const live = activeRef.current && speakingRef.current;
-      const count = 112;
+      const live = smoothA > 0.1 && speakingRef.current;
+      const count = 128;
 
       for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count;
         const band = bands[i % bands.length] || 0;
-        const surface =
-          Math.sin(angle * 2.1 + time * 0.95) * (live ? 2.5 : 0.9) +
-          Math.sin(angle * 3.7 - time * 0.68) * (live ? 1.7 : 0.55) +
-          band * (live ? 8.5 : 1.8);
-        const r = radius + pulse * 8 + surface;
+        const wave1 = Math.sin(angle * 3.0 + time * 0.8) * 1.2;
+        const wave2 = Math.sin(angle * 5.2 - time * 0.5) * 0.7;
+        const wave3 = Math.sin(angle * 1.7 + time * 1.1) * 0.5;
+        const surface = (wave1 + wave2 + wave3) * (live ? 1.0 : 0.3) + band * (live ? 7.0 : 0.5) * smoothA;
+        const r = radius + pulse * 6 + surface;
 
         points.push({
           x: cx + Math.cos(angle) * r,
@@ -1159,8 +1161,9 @@ function LimeVoiceOrb({
         });
       }
 
-      points.forEach((point, index) => {
-        const next = points[(index + 1) % points.length];
+      const pointsArray = points;
+      pointsArray.forEach((point, index) => {
+        const next = pointsArray[(index + 1) % pointsArray.length];
         const midX = (point.x + next.x) / 2;
         const midY = (point.y + next.y) / 2;
 
@@ -1174,6 +1177,8 @@ function LimeVoiceOrb({
       path.closePath();
       return path;
     };
+
+    let points: Array<{ x: number; y: number }> = [];
 
     const drawGlow = (cx: number, cy: number, radius: number, inner: string, outer: string) => {
       const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
@@ -1190,41 +1195,47 @@ function LimeVoiceOrb({
       const cx = width / 2;
       const cy = height / 2;
       const time = frame / 60;
-      const rawLevel = activeRef.current ? Math.max(levelRef.current, speakingRef.current ? 0.035 : 0) : 0;
-      displayLevel += (rawLevel - displayLevel) * 0.16;
+
+      smoothActiveRef.current += (targetActiveRef.current - smoothActiveRef.current) * 0.08;
+      const smoothA = smoothActiveRef.current;
+
+      const rawLevel = activeRef.current ? Math.max(levelRef.current, speakingRef.current ? 0.03 : 0) : 0;
+      displayLevel += (rawLevel - displayLevel) * 0.12;
       const bands = bandsRef.current.length ? bandsRef.current : Array(20).fill(0);
       const bandEnergy = bands.reduce((sum, band) => sum + band, 0) / Math.max(bands.length, 1);
-      const pulse = Math.min(1, Math.max(displayLevel, bandEnergy * 1.25));
-      const live = activeRef.current && speakingRef.current;
-      const baseRadius = 93;
+      const pulse = Math.min(1, Math.max(displayLevel, bandEnergy * 1.1));
+      const live = smoothA > 0.3 && speakingRef.current;
+      const baseRadius = 90;
 
       ctx.clearRect(0, 0, width, height);
 
+      const glowAlpha = smoothA * (0.35 + pulse * 0.25);
       ctx.save();
-      ctx.globalAlpha = activeRef.current ? 0.42 + pulse * 0.28 : 0.24;
-      ctx.filter = 'blur(34px)';
-      drawGlow(cx, cy, 118 + pulse * 22, 'rgba(190,242,100,0.42)', 'rgba(22,101,52,0)');
+      ctx.globalAlpha = glowAlpha;
+      ctx.filter = 'blur(38px)';
+      drawGlow(cx, cy, 130 + pulse * 20, 'rgba(190,242,100,0.5)', 'rgba(22,101,52,0)');
       ctx.restore();
 
+      const ringAlpha = smoothA * (0.2 + pulse * 0.2);
       ctx.save();
-      ctx.globalAlpha = activeRef.current ? 0.24 + pulse * 0.26 : 0.12;
-      ctx.strokeStyle = 'rgba(190,242,100,0.34)';
-      ctx.lineWidth = 1;
+      ctx.globalAlpha = ringAlpha;
+      ctx.strokeStyle = 'rgba(190,242,100,0.4)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(cx, cy, 116 + pulse * 16, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 112 + pulse * 14, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
 
-      const orbPath = makeOrbPath(cx, cy, baseRadius, pulse, time);
+      const orbPath = makeOrbPath(cx, cy, baseRadius, pulse, time, smoothA);
 
       ctx.save();
-      ctx.shadowColor = 'rgba(190,242,100,0.38)';
-      ctx.shadowBlur = 38 + pulse * 28;
-      const bodyGradient = ctx.createRadialGradient(cx - 38, cy - 48, 8, cx, cy, 126);
-      bodyGradient.addColorStop(0, 'rgba(236,252,203,0.76)');
-      bodyGradient.addColorStop(0.27, 'rgba(163,230,53,0.58)');
-      bodyGradient.addColorStop(0.58, 'rgba(34,197,94,0.46)');
-      bodyGradient.addColorStop(1, 'rgba(5,46,22,0.96)');
+      ctx.shadowColor = 'rgba(190,242,100,0.45)';
+      ctx.shadowBlur = 32 + pulse * 24;
+      const bodyGradient = ctx.createRadialGradient(cx - 30, cy - 40, 6, cx, cy, 120);
+      bodyGradient.addColorStop(0, `rgba(236,252,203,${0.72 * smoothA})`);
+      bodyGradient.addColorStop(0.25, `rgba(180,235,80,${0.55 * smoothA})`);
+      bodyGradient.addColorStop(0.55, `rgba(50,195,90,${0.42 * smoothA})`);
+      bodyGradient.addColorStop(1, `rgba(5,46,22,${0.92 * smoothA})`);
       ctx.fillStyle = bodyGradient;
       ctx.fill(orbPath);
       ctx.restore();
@@ -1232,42 +1243,50 @@ function LimeVoiceOrb({
       ctx.save();
       ctx.clip(orbPath);
       ctx.globalCompositeOperation = 'screen';
-      drawGlow(
-        cx - 38 + Math.sin(time * 0.7) * 12,
-        cy - 34 + Math.cos(time * 0.55) * 10,
-        78 + pulse * 12,
-        'rgba(236,252,203,0.52)',
-        'rgba(236,252,203,0)'
-      );
-      drawGlow(
-        cx + 40 + Math.cos(time * 0.62) * 14,
-        cy + 24 + Math.sin(time * 0.75) * 12,
-        90 + pulse * 18,
-        'rgba(16,185,129,0.44)',
-        'rgba(16,185,129,0)'
-      );
-      drawGlow(
-        cx - 6 + Math.sin(time * 0.5) * 18,
-        cy + 34 + Math.cos(time * 0.46) * 10,
-        98,
-        'rgba(132,204,22,0.22)',
-        'rgba(132,204,22,0)'
-      );
+
+      const glow1X = cx - 35 + Math.sin(time * 0.6) * 10;
+      const glow1Y = cy - 30 + Math.cos(time * 0.5) * 8;
+      const grad1 = ctx.createRadialGradient(glow1X, glow1Y, 0, glow1X, glow1Y, 70 + pulse * 10);
+      grad1.addColorStop(0, `rgba(236,252,203,${0.48 * smoothA})`);
+      grad1.addColorStop(1, 'rgba(236,252,203,0)');
+      ctx.fillStyle = grad1;
+      ctx.fillRect(0, 0, width, height);
+
+      const glow2X = cx + 38 + Math.cos(time * 0.55) * 12;
+      const glow2Y = cy + 22 + Math.sin(time * 0.7) * 10;
+      const grad2 = ctx.createRadialGradient(glow2X, glow2Y, 0, glow2X, glow2Y, 80 + pulse * 14);
+      grad2.addColorStop(0, `rgba(20,180,120,${0.38 * smoothA})`);
+      grad2.addColorStop(1, 'rgba(20,180,120,0)');
+      ctx.fillStyle = grad2;
+      ctx.fillRect(0, 0, width, height);
+
+      const glow3X = cx - 5 + Math.sin(time * 0.45) * 14;
+      const glow3Y = cy + 32 + Math.cos(time * 0.4) * 8;
+      const grad3 = ctx.createRadialGradient(glow3X, glow3Y, 0, glow3X, glow3Y, 85);
+      grad3.addColorStop(0, `rgba(140,210,40,${0.18 * smoothA})`);
+      grad3.addColorStop(1, 'rgba(140,210,40,0)');
+      ctx.fillStyle = grad3;
+      ctx.fillRect(0, 0, width, height);
+
       ctx.restore();
 
+      const strokeAlpha = smoothA * (0.12 + pulse * 0.22);
       ctx.save();
-      ctx.strokeStyle = `rgba(217,249,157,${0.16 + pulse * 0.26})`;
-      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = `rgba(217,249,157,${strokeAlpha})`;
+      ctx.lineWidth = 1.5;
       ctx.stroke(orbPath);
       ctx.restore();
 
-      ctx.save();
-      ctx.globalAlpha = live ? 0.14 + pulse * 0.18 : 0.06;
-      ctx.fillStyle = 'rgba(255,255,255,0.58)';
-      ctx.beginPath();
-      ctx.ellipse(cx - 36, cy - 46, 24 + pulse * 6, 11 + pulse * 3, -0.55, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      if (smoothA > 0.5) {
+        const highlightAlpha = (live ? 0.12 + pulse * 0.16 : 0.04) * smoothA;
+        ctx.save();
+        ctx.globalAlpha = highlightAlpha;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath();
+        ctx.ellipse(cx - 32, cy - 42, 20 + pulse * 5, 9 + pulse * 2, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
       frame += 1;
       raf = requestAnimationFrame(draw);
@@ -3655,11 +3674,15 @@ Tasks:
         </div>
         
         <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          {isActive && ( 
-            <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] ${isAgentSpeaking ? 'border-lime-300/50 bg-lime-300/10 text-lime-300' : 'border-sky-400/50 bg-sky-400/10 text-sky-300'}`}>
-              {isAgentSpeaking ? 'Speaking...' : 'Listening...'}
-            </span> 
-          )}
+          <span className={`rounded-full border px-4 py-1 text-[10px] uppercase tracking-[0.2em] ${
+            isActive 
+              ? isAgentSpeaking 
+                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300' 
+                : 'border-lime-300/50 bg-lime-300/10 text-lime-300'
+              : 'border-white/10 bg-white/5 text-zinc-500'
+          }`}>
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
         </div>
         
         <div className="flex items-center gap-6">
