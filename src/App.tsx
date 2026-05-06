@@ -114,10 +114,10 @@ const GEMINI_LIVE_VOICE_OPTIONS =[
   { alias: 'Wonder Woman', id: 'Kore', vibe: 'clear, composed, warm' },
   { alias: 'Batman', id: 'Fenrir', vibe: 'dark, firm, serious' },
   { alias: 'Iron Man', id: 'Puck', vibe: 'quick, bright, witty' },
-  { alias: 'Athena', id: 'Aoede', vibe: 'elegant, smooth, intelligent' },
-  { alias: 'Captain Marvel', id: 'Zephyr', vibe: 'bright, airy, confident' },
+  { alias: 'Supergirl', id: 'Aoede', vibe: 'elegant, smooth, intelligent' },
+  { alias: 'Athena', id: 'Laomedeia', vibe: 'clear, bright, friendly' },
   { alias: 'Black Panther', id: 'Orus', vibe: 'royal, calm, precise' },
-  { alias: 'Scarlet Witch', id: 'Leda', vibe: 'soft, mysterious, expressive' },
+  { alias: 'Scarlet Witch', id: 'Leda', vibe: 'soft, warm, gentle, sweet, full of human nuance' },
   { alias: 'Storm', id: 'Callirrhoe', vibe: 'flowing, strong, graceful' },
   { alias: 'Jean Grey', id: 'Autonoe', vibe: 'controlled, thoughtful, warm' },
   { alias: 'Thor', id: 'Enceladus', vibe: 'heavy, bold, powerful' },
@@ -274,7 +274,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
   agentName: 'Beatrice',
   personality: DEFAULT_AGENT_PERSONALITY,
   avatarUrl: '',
-  selectedVoice: 'Kore',
+  selectedVoice: 'Aoede',
   selectedLanguage: 'English',
   knowledgeBase: '',
 };
@@ -2027,6 +2027,13 @@ function BeatriceAgent({
   const lastSavedUserTranscriptRef = useRef('');
   const stopSessionRef = useRef<() => void>(() => {});
 
+  const userSilenceStartRef = useRef<number | null>(null);
+  const lastFillerTimeRef = useRef<number>(0);
+  const isUserSpeakingRef = useRef(false);
+  const fillerCheckIntervalRef = useRef<any>(null);
+  const lastAudioSendTimeRef = useRef<number>(0);
+  const isAgentSpeakingRef = useRef(false);
+
   useEffect(() => { 
     isMutedRef.current = isMuted; 
   }, [isMuted]);
@@ -2034,6 +2041,10 @@ function BeatriceAgent({
   useEffect(() => { 
     isActiveRef.current = isActive; 
   }, [isActive]);
+
+  useEffect(() => { 
+    isAgentSpeakingRef.current = isAgentSpeaking; 
+  }, [isAgentSpeaking]);
 
   useEffect(() => {
     let wakeLock: any = null;
@@ -2996,8 +3007,10 @@ function BeatriceAgent({
               
               if (serverContent.inputTranscription?.text) { 
                 const text = serverContent.inputTranscription.text;
-                userTranscriptBufferRef.current = text.trim(); 
-                updateLiveTranscript('user', userTranscriptBufferRef.current, 3200); 
+                userTranscriptBufferRef.current = text.trim();
+                updateLiveTranscript('user', userTranscriptBufferRef.current, 3200);
+                isUserSpeakingRef.current = true;
+                userSilenceStartRef.current = null;
 
                 if (pendingToolCallsRef.current && pendingToolCallsRef.current.length > 0) {
                    checkConfirmation(text);
@@ -3043,19 +3056,94 @@ function BeatriceAgent({
         try { audioRecorderRef.current.stop(); } catch(e) {}
       }
 
-      audioRecorderRef.current = new AudioRecorder((base64) => { 
-        if (isMutedRef.current) return; 
-        sendAudioToLive(base64); 
+      audioRecorderRef.current = new AudioRecorder((base64) => {
+        if (isMutedRef.current) return;
+
+        const currentLevel = audioRecorderRef.current?.getLevel() || 0;
+        const now = Date.now();
+
+        if (currentLevel > 0.08) {
+          if (!isUserSpeakingRef.current) {
+            isUserSpeakingRef.current = true;
+            userSilenceStartRef.current = null;
+          }
+
+          if (isAgentSpeakingRef.current) {
+            if (audioStreamerRef.current) {
+              try { audioStreamerRef.current.stop(); } catch(e) {}
+            }
+            setIsAgentSpeaking(false);
+            modelTranscriptBufferRef.current = '';
+            sendTextToLive('[SYSTEM: User interrupted with barge-in. Stop current response and listen to user.]');
+          }
+        } else {
+          if (isUserSpeakingRef.current) {
+            isUserSpeakingRef.current = false;
+            userSilenceStartRef.current = now;
+          }
+        }
+
+        lastAudioSendTimeRef.current = now;
+        sendAudioToLive(base64);
       });
       
       await audioRecorderRef.current.start();
 
-      setIsActive(true); 
-      isActiveRef.current = true; 
+      setIsActive(true);
+      isActiveRef.current = true;
       setConnecting(false);
       connectingRef.current = false;
       startMicVisualizer();
-      
+
+      fillerCheckIntervalRef.current = setInterval(() => {
+        if (!isActiveRef.current || isMutedRef.current || !sessionRef.current) return;
+
+        const now = Date.now();
+        const silenceStart = userSilenceStartRef.current;
+        if (!silenceStart || isUserSpeakingRef.current || isAgentSpeakingRef.current) return;
+
+        const silenceDuration = now - silenceStart;
+        const lastFiller = lastFillerTimeRef.current;
+        const sinceLastFiller = now - lastFiller;
+
+        const MIN_FILLER_INTERVAL = 6000;
+        const SHORT_SILENCE_MIN = 2000;
+        const MEDIUM_SILENCE_MIN = 8000;
+        const LONG_SILENCE_MIN = 18000;
+
+        if (sinceLastFiller < MIN_FILLER_INTERVAL) return;
+
+        let filler = '';
+        if (silenceDuration >= LONG_SILENCE_MIN) {
+          const longFillers = [
+            "Take your time, Boss... I'm here.",
+            "No rush, Boss. I'm listening.",
+            "Still here, Boss. Whenever you're ready."
+          ];
+          filler = longFillers[Math.floor(Math.random() * longFillers.length)];
+        } else if (silenceDuration >= MEDIUM_SILENCE_MIN) {
+          const mediumFillers = [
+            "You still with me, Boss?",
+            "I might have missed you there — are we continuing?",
+            "Mm... still here, Boss."
+          ];
+          filler = mediumFillers[Math.floor(Math.random() * mediumFillers.length)];
+        } else if (silenceDuration >= SHORT_SILENCE_MIN) {
+          const shortFillers = [
+            "Mm?",
+            "Yeah?",
+            "Mm-hmm.",
+            "I'm here."
+          ];
+          filler = shortFillers[Math.floor(Math.random() * shortFillers.length)];
+        }
+
+        if (filler) {
+          sendTextToLive(`[FILLER: ${filler}]`);
+          lastFillerTimeRef.current = now;
+        }
+      }, 1500);
+
       setTimeout(() => { 
         sendTextToLive(`${settings.userName} is here in the office. Start like ${settings.agentName} is already sitting at the desk nearby as the office employee. Begin in ${settings.selectedLanguage} normally and respectfully.`); 
       }, 500);
@@ -3290,6 +3378,15 @@ function BeatriceAgent({
 
     stopMicVisualizer();
 
+    if (fillerCheckIntervalRef.current) {
+      clearInterval(fillerCheckIntervalRef.current);
+      fillerCheckIntervalRef.current = null;
+    }
+
+    userSilenceStartRef.current = null;
+    isUserSpeakingRef.current = false;
+    lastFillerTimeRef.current = 0;
+
     if (videoIntervalRef.current) {
       clearInterval(videoIntervalRef.current);
       videoIntervalRef.current = null;
@@ -3307,6 +3404,7 @@ function BeatriceAgent({
     modelTranscriptBufferRef.current = '';
     userTranscriptBufferRef.current = '';
     isActiveRef.current = false;
+    isAgentSpeakingRef.current = false;
     pendingToolCallsRef.current = null;
 
     setIsVideoEnabled(false);
