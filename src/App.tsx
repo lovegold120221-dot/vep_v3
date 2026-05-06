@@ -3691,45 +3691,23 @@ Tasks:
       </AnimatePresence>
 
       <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-6 py-4 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => { setIsVoiceActive(!isVoiceActive); setShowSidebar(false); }}
-            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-              isVoiceActive
-                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
-                : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
-            }`}
-            aria-label="Toggle Voice Mode"
-          >
-            <span className={`font-mono text-[14px] tracking-widest ${isVoiceActive ? 'text-lime-300' : ''}`}>
-              ။‖‖‖။
-            </span>
-            <span className="hidden sm:inline">Voice</span>
-          </button>
-
-          <button
-            onClick={() => { setShowSidebar(true); setIsVoiceActive(false); }}
-            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
-              showSidebar && !isVoiceActive
-                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
-                : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
-            }`}
-            aria-label="Open Chat"
-          >
-            <MessageCircle className={`h-4 w-4 ${showSidebar && !isVoiceActive ? 'text-lime-300' : ''}`} />
-            <span className="hidden sm:inline">Chat</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setShowSidebar(!showSidebar)}
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+            showSidebar
+              ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
+              : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
+          }`}
+          aria-label="Toggle Chat"
+        >
+          <MessageCircle className={`h-4 w-4 ${showSidebar ? 'text-lime-300' : ''}`} />
+          <span className="hidden sm:inline">Chat</span>
+        </button>
 
         <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center">
-          {isVoiceActive && (
-            <span className="rounded-full border border-lime-300/50 bg-lime-300/10 px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-lime-300">
-              Voice Active
-            </span>
-          )}
-          {!isVoiceActive && showSidebar && (
+          {showSidebar && (
             <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-              Chat Mode
+              Chat
             </span>
           )}
         </div>
@@ -4068,10 +4046,6 @@ Tasks:
                   className="border-t border-white/10 bg-[#070807]/95 p-3 backdrop-blur-xl"
                 >
                   <div className="flex items-center gap-2 rounded-2xl border border-lime-300/15 bg-black/45 p-2 shadow-2xl">
-                    <span className="font-mono text-[14px] tracking-widest text-zinc-400">
-                      ။‖‖‖။
-                    </span>
-
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -4079,6 +4053,15 @@ Tasks:
                       aria-label="Attach file"
                     >
                       <Paperclip className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => { setIsVoiceActive(true); setShowSidebar(false); }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
+                      aria-label="Activate Voice Mode"
+                    >
+                      <Mic className="h-4 w-4" />
                     </button>
 
                     <input
