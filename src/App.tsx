@@ -2916,7 +2916,17 @@ function BeatriceAgent({
         `You MUST follow the above BIBLE rules absolutely every time. Never deviate. The HARD GATE above is the first checkpoint; the BIBLE is the full ruleset.`,
         `=== END BIBLE ===`,
         BASE_LIVE_AGENT_PROMPT || '',
-        historyContext,
+        `=== CONVERSATION CONTEXT & MEMORY ===`,
+        `This is the full conversation history for this session — use it as your working memory:`,
+        historyContext || '(No previous messages in this session)',
+        ``,
+        `=== LONG-TERM MEMORY (Knowledge Base) ===`,
+        settings.knowledgeBase
+          ? `From your persistent knowledge base:\n${settings.knowledgeBase}`
+          : `(No long-term memory stored yet. The knowledge base is empty.)`,
+        ``,
+        `IMPORTANT: Use the conversation history above for context. Reference facts, decisions, and topics from previous messages when relevant. Use the knowledge base for persistent information across sessions.`,
+        `When user asks about something discussed before, check the conversation history above first. When user mentions something from a previous session, check your knowledge base.`,
         `Current physical location context: Baguio, Philippines. Use this if the user asks for weather, places, directions, etc., without specifying a city.`,
         `Product brand: VEP, which means Virtual Employee Persona. Default persona: Beatrice, Boss Jo Lernout's secretary.`,
         `User preferred name: ${settings.userName}.`,
