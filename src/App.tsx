@@ -2063,6 +2063,12 @@ function BeatriceAgent({
   const videoCreditsRef = useRef<number>(2);
   const deviceIdRef = useRef<string>('');
   const hasGeneratedVideoRef = useRef<boolean>(false);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const isVoiceActiveRef = useRef(false);
+
+  useEffect(() => {
+    isVoiceActiveRef.current = isVoiceActive;
+  }, [isVoiceActive]);
 
   useEffect(() => { 
     isMutedRef.current = isMuted; 
@@ -3684,57 +3690,60 @@ Tasks:
         )}
       </AnimatePresence>
 
-      <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-8 py-6 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
-<div className="flex items-center gap-4">
-           <button
-             onClick={() => setShowSidebar(true)}
-             className="-ml-2 rounded-xl border border-white/10 p-2 text-zinc-400 transition-all hover:bg-white/5 hover:text-white"
-             aria-label="Open Chat"
-           >
-            <MessageCircle className="block h-5 w-5 sm:hidden" />
-            <Menu className="hidden h-5 w-5 sm:block" />
-           </button>
-          
-          <div className="hidden items-center gap-3 sm:flex">
-            <img src={EBURON_LOGO_URL} alt="Eburon" className="h-8 w-8 rounded-full object-cover" />
-            <div className="leading-none">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-lime-200">{PRODUCT_BRAND}</p>
-              <p className="mt-1 text-[10px] text-zinc-600">{PRODUCT_FULL_NAME}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          <span className={`rounded-full border px-4 py-1 text-[10px] uppercase tracking-[0.2em] ${
-            isActive 
-              ? isAgentSpeaking 
-                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300' 
-                : 'border-lime-300/50 bg-lime-300/10 text-lime-300'
-              : 'border-white/10 bg-white/5 text-zinc-500'
-          }`}>
-            {isActive ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <div className="mr-2 hidden flex-col items-end sm:flex">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">Voice</span>
-            <span className="flex items-center gap-1.5 font-mono text-[10px] text-lime-300">{selectedVoiceMeta.alias}</span>
-          </div>
-          
-          <button 
-            onClick={() => setShowProfile(true)} 
-            className="h-10 w-10 overflow-hidden rounded-full border border-white/10 transition-all hover:border-lime-300/50 focus:outline-none focus:ring-2 focus:ring-lime-300/50"
+      <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-6 py-4 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { setIsVoiceActive(!isVoiceActive); setShowSidebar(false); }}
+            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+              isVoiceActive
+                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
+                : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
+            }`}
+            aria-label="Toggle Voice Mode"
           >
-            {settings.avatarUrl || user.photoURL ? ( 
-              <img src={settings.avatarUrl || user.photoURL || ''} alt="Profile" className="h-full w-full object-cover" /> 
-            ) : ( 
-              <div className="flex h-full w-full items-center justify-center bg-zinc-800 font-bold">
-                {settings.userName?.[0] || 'U'}
-              </div> 
-            )}
+            <Mic className={`h-4 w-4 ${isVoiceActive ? 'text-lime-300' : ''}`} />
+            <span className="hidden sm:inline">Voice</span>
+          </button>
+
+          <button
+            onClick={() => { setShowSidebar(true); setIsVoiceActive(false); }}
+            className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+              showSidebar && !isVoiceActive
+                ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
+                : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
+            }`}
+            aria-label="Open Chat"
+          >
+            <MessageCircle className={`h-4 w-4 ${showSidebar && !isVoiceActive ? 'text-lime-300' : ''}`} />
+            <span className="hidden sm:inline">Chat</span>
           </button>
         </div>
+
+        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center">
+          {isVoiceActive && (
+            <span className="rounded-full border border-lime-300/50 bg-lime-300/10 px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-lime-300">
+              Voice Active
+            </span>
+          )}
+          {!isVoiceActive && showSidebar && (
+            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+              Chat Mode
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={() => setShowProfile(true)}
+          className="h-10 w-10 overflow-hidden rounded-full border border-white/10 transition-all hover:border-lime-300/50 focus:outline-none focus:ring-2 focus:ring-lime-300/50"
+        >
+          {settings.avatarUrl || user.photoURL ? (
+            <img src={settings.avatarUrl || user.photoURL || ''} alt="Profile" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-zinc-800 font-bold text-zinc-400">
+              {settings.userName?.[0] || 'U'}
+            </div>
+          )}
+        </button>
       </header>
 
       {!isVideoEnabled && (
@@ -3746,12 +3755,33 @@ Tasks:
             <div className="absolute left-0 right-0 top-1/2 h-px bg-gradient-to-r from-transparent via-lime-300/[0.04] to-transparent" />
           </div>
 
-          <LimeVoiceOrb 
-            isActive={isActive} 
-            isAgentSpeaking={isAgentSpeaking} 
-            speakerLevel={speakerLevel} 
-            speakerBands={speakerBands} 
+<LimeVoiceOrb
+            isActive={isActive}
+            isAgentSpeaking={isAgentSpeaking}
+            speakerLevel={speakerLevel}
+            speakerBands={speakerBands}
           />
+
+          {isVoiceActive && isActive && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-2"
+            >
+              <div className="flex gap-0.5">
+                {[...Array(4)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-lime-300 animate-pulse"
+                    style={{ animationDelay: `${i * 150}ms`, opacity: 0.5 + i * 0.15 }}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] font-medium uppercase tracking-widest text-lime-300/80">
+                Continue speaking...
+              </span>
+            </motion.div>
+          )}
 
           <AnimatePresence>
             {currentTranscript && ( 
@@ -3924,44 +3954,34 @@ Tasks:
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 border-b border-white/10 p-4">
-                <button 
-                  onClick={() => fileInputRef.current?.click()} 
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-lime-200 transition hover:bg-lime-300/15"
-                >
-                  <Paperclip className="h-4 w-4" /> Attach
-                </button>
-                
-                <button 
-                  onClick={() => setChatInput('Build ')} 
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-200 transition hover:bg-white/10"
-                >
-                  <Code2 className="h-4 w-4" /> Build
-                </button>
-                
-                <button 
-                  onClick={() => { setShowSidebar(false); setShowMeetingRecorder(true); }} 
-                  className="col-span-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-sky-400/30 bg-sky-400/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-sky-300 transition hover:bg-sky-400/20"
-                >
-                  <Mic className="h-4 w-4" /> Record Meeting & Analyze
-                </button>
-              </div>
-
               <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-lime-300/5 to-transparent px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-lime-300" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chat Mode</span>
+                  </div>
+                  {isActive && (
+                    <span className="flex items-center gap-1.5 rounded-full border border-lime-300/30 bg-lime-300/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-lime-300">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-lime-300" />
+                      Active
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-3">
                   {historyMsgs.map((msg, i) => (
-                    <div 
-                      key={`${msg.timestamp}-${i}`} 
+                    <div
+                      key={`${msg.timestamp}-${i}`}
                       className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                     >
                       <span className="mb-1 text-[8px] uppercase tracking-widest text-zinc-600">
                         {msg.role === 'user' ? settings.userName : settings.agentName}
                       </span>
-                      
-                      <div 
+
+                      <div
                         className={`max-w-[92%] rounded-2xl p-3 text-xs leading-relaxed overflow-hidden break-words whitespace-pre-wrap ${
-                          msg.role === 'user' 
-                            ? 'rounded-tr-sm border border-sky-400/20 bg-sky-400/10 text-sky-100' 
+                          msg.role === 'user'
+                            ? 'rounded-tr-sm border border-sky-400/20 bg-sky-400/10 text-sky-100'
                             : 'rounded-tl-sm border border-lime-300/10 bg-white/5 text-zinc-300'
                         }`}
                       >
@@ -4060,33 +4080,42 @@ Tasks:
                   <div ref={messagesEndRef} />
                 </div>
                 
-                <form 
-                  onSubmit={sendChatMessage} 
+<form
+                  onSubmit={sendChatMessage}
                   className="border-t border-white/10 bg-[#070807]/95 p-3 backdrop-blur-xl"
                 >
                   <div className="flex items-center gap-2 rounded-2xl border border-lime-300/15 bg-black/45 p-2 shadow-2xl">
-                     <button 
-                       type="button" 
-                       onClick={() => fileInputRef.current?.click()} 
-                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
-                       aria-label="Attach file"
-                     >
+                    <button
+                      type="button"
+                      onClick={() => { setIsVoiceActive(true); setShowSidebar(false); }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
+                      aria-label="Activate Voice Mode"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
+                      aria-label="Attach file"
+                    >
                       <Paperclip className="h-4 w-4" />
                     </button>
-                    
-                     <input 
-                       value={chatInput} 
-                       onChange={(e) => setChatInput(e.target.value)} 
-                       placeholder={`Message ${settings.agentName}...`} 
-                       className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-zinc-600" 
-                     />
-                    
-                     <button 
-                       type="submit" 
-                       disabled={!chatInput.trim()} 
-                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-300 text-black transition hover:bg-lime-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-                       aria-label="Send message"
-                     >
+
+                    <input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder={`Message ${settings.agentName}...`}
+                      className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-300 text-black transition hover:bg-lime-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Send message"
+                    >
                       <Send className="h-4 w-4" />
                     </button>
                   </div>
