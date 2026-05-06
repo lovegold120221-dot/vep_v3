@@ -3768,15 +3768,9 @@ Tasks:
               animate={{ opacity: 1, y: 0 }}
               className="mt-6 flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-2"
             >
-              <div className="flex gap-0.5">
-                {[...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-1.5 w-1.5 rounded-full bg-lime-300 animate-pulse"
-                    style={{ animationDelay: `${i * 150}ms`, opacity: 0.5 + i * 0.15 }}
-                  />
-                ))}
-              </div>
+              <span className="font-mono text-[14px] tracking-widest text-lime-300">
+                ။‖‖‖။
+              </span>
               <span className="text-[10px] font-medium uppercase tracking-widest text-lime-300/80">
                 Continue speaking...
               </span>
