@@ -1731,10 +1731,11 @@ export default function App() {
       
       const result = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
       const credential = GoogleAuthProvider.credentialFromResult(result);
-      
+
       if (credential?.accessToken) {
         localStorage.setItem('googleAccessToken', credential.accessToken);
       }
+      window.location.reload();
     } catch (error: any) {
       if (error && error.message && error.message.includes('missing initial state')) {
         setAuthMessage({ 
@@ -1785,11 +1786,13 @@ export default function App() {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(result.user, { displayName: fullName });
         localStorage.removeItem('googleAccessToken');
+        window.location.reload();
         return;
       }
-      
-      await signInWithEmailAndPassword(auth, email, password); 
+
+      await signInWithEmailAndPassword(auth, email, password);
       localStorage.removeItem('googleAccessToken');
+      window.location.reload();
     } catch (error: any) { 
       setAuthMessage({ type: 'error', text: getAuthErrorMessage(error) }); 
     } finally { 
