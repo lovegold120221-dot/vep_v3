@@ -76,7 +76,7 @@ export async function generateAssistantVideo(
 
   const imageUrl = args.imageUrl;
   const aspectRatio = normalizeAspectRatio(args.aspectRatio);
-  const durationSeconds = Math.min(Number(args.durationSeconds) || 6, 6);
+  const durationSeconds = 15;
 
   const payload: any = {
     model: 'bytedance/seedance-2.0-fast',
