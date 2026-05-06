@@ -3934,9 +3934,9 @@ Tasks:
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-0 z-[101] flex w-full flex-col border-r border-white/10 bg-[#0A0A0B] shadow-2xl sm:bottom-0 sm:top-auto sm:left-0 sm:w-96 sm:max-w-[88vw] sm:rounded-t-2xl"
+              className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl"
             >
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur-xl">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-4 w-4 text-lime-300" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
@@ -3951,13 +3951,6 @@ Tasks:
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex items-center justify-between border-b border-white/10 bg-gradient-to-r from-lime-300/5 to-transparent px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4 text-lime-300" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
-                  </div>
-                </div>
-
                 <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-3">
                   {historyMsgs.map((msg, i) => (
                     <div
@@ -4075,14 +4068,9 @@ Tasks:
                   className="border-t border-white/10 bg-[#070807]/95 p-3 backdrop-blur-xl"
                 >
                   <div className="flex items-center gap-2 rounded-2xl border border-lime-300/15 bg-black/45 p-2 shadow-2xl">
-                    <button
-                      type="button"
-                      onClick={() => { setIsVoiceActive(true); setShowSidebar(false); }}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
-                      aria-label="Activate Voice Mode"
-                    >
-                      <Mic className="h-4 w-4" />
-                    </button>
+                    <span className="font-mono text-[14px] tracking-widest text-zinc-400">
+                      ။‖‖‖။
+                    </span>
 
                     <button
                       type="button"
