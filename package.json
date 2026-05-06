@@ -12,10 +12,13 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.3",
     "@tailwindcss/vite": "^4.1.14",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
+    "ai": "^6.0.175",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^12.12.1",

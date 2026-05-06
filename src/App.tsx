@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef, type FormEvent } from 'react';
 import { auth, rtdb, handleDatabaseError, OperationType } from './firebase';
+import { supabase } from './lib/supabase';
 import {
   signInWithPopup,
   GoogleAuthProvider,
@@ -58,6 +59,7 @@ import {
   Globe
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { experimental_generateVideo as generateVideo } from 'ai';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -72,6 +74,7 @@ interface ChatMessage {
   downloadFilename?: string;
   htmlPreviewData?: string;
   htmlPreviewFilename?: string;
+  videoUrl?: string;
 }
 
 interface ActionTask {
@@ -169,6 +172,10 @@ Tone:
 - never overly cheerful
 - never over-explaining
 - never customer-service-like
+
+Capabilities:
+- Video Generation: Can create cinematic videos from text or images.
+- Long-term Memory: Can learn new skills and remember custom instructions via the knowledge base.
 
 Response length:
 Keep responses short unless more detail is clearly needed.
@@ -273,15 +280,15 @@ const DEFAULT_SETTINGS: AgentSettings = {
 
 const GOOGLE_SERVICE_TOOLS =[
   {
-    name: 'update_knowledge_base',
-    description: 'Save a new skill or long-term memory to the knowledge base. Use this when the user wants you to learn a new capability, remember a specific preference, or define a custom "skill" for future use.',
+    name: 'generate_video',
+    description: 'Generate a high-quality video based on a text prompt and an optional starting image. Use this when the user asks to create a video, animation, or visual scene. If the user provides an image, use it as the reference frame.',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        skillName: { type: Type.STRING, description: 'The name of the skill or memory (e.g., "Expert Budgeting", "Boss Preferences").' },
-        instructions: { type: Type.STRING, description: 'The detailed instructions, rules, or facts that define this skill or memory.' },
+        prompt: { type: Type.STRING, description: 'Detailed description of the video to generate.' },
+        imageUrl: { type: Type.STRING, description: 'Optional public URL of the starting image.' },
       },
-      required: ['skillName', 'instructions'],
+      required: ['prompt'],
     },
   },
   {
@@ -2466,6 +2473,48 @@ function BeatriceAgent({
             summary: `Successfully saved skill "${args.skillName}" to long-term memory.` 
           };
         }
+        case 'generate_video': {
+          let finalImageUrl = args.imageUrl;
+          if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+            const fileName = `start-frame-${Date.now()}.jpg`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('videos')
+              .upload(`inputs/${fileName}`, decodeURIComponent(finalImageUrl.split(',')[1]), {
+                contentType: 'image/jpeg',
+              });
+            if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
+            const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(uploadData?.path || `inputs/${fileName}`);
+            finalImageUrl = publicUrl;
+          }
+
+          const result = await (generateVideo as any)({
+            model: 'bytedance/seedance-2.0-fast',
+            prompt: args.prompt,
+            image: finalImageUrl ? { url: finalImageUrl } : undefined,
+          });
+
+          const videoResponse = await fetch((result as any).url);
+          const videoBlob = await videoResponse.blob();
+          const videoFileName = `gen-video-${Date.now()}.mp4`;
+          
+          const { data: videoUploadData, error: videoUploadError } = await supabase.storage
+            .from('videos')
+            .upload(`outputs/${videoFileName}`, videoBlob, {
+              contentType: 'video/mp4',
+              upsert: true
+            });
+
+          if (videoUploadError) throw new Error(`Video upload failed: ${videoUploadError.message}`);
+          const { data: { publicUrl: finalVideoUrl } } = supabase.storage.from('videos').getPublicUrl(`outputs/${videoFileName}`);
+
+          return { 
+            toolName, 
+            executedAt, 
+            status: 'completed', 
+            videoUrl: finalVideoUrl, 
+            summary: `Generated the video: ${args.prompt}` 
+          };
+        }
         case 'maps_search_places': {
           const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
           if (!apiKey) throw new Error("VITE_GOOGLE_API_KEY is missing. Add it to your environment variables to use Google Maps Platform.");
@@ -3722,16 +3771,33 @@ Tasks:
                           </div> 
                         )}
                         
-                        {msg.toolName && ( 
-                          <div className="mb-2 flex items-center gap-2 rounded-xl bg-lime-300/10 px-2 py-1 text-[10px] text-lime-200">
-                            <FileText className="h-3 w-3" />
-                            Tool Output: {msg.toolName}
-                          </div> 
-                        )}
-                        
-                        {msg.text}
-                        
-                        {msg.htmlPreviewData && msg.htmlPreviewFilename && (
+                         {msg.toolName && ( 
+                           <div className="mb-2 flex items-center gap-2 rounded-xl bg-lime-300/10 px-2 py-1 text-[10px] text-lime-200">
+                             <FileText className="h-3 w-3" />
+                             Tool Output: {msg.toolName}
+                           </div> 
+                         )}
+                         
+                         {msg.videoUrl && (
+                           <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-black">
+                             <video 
+                               src={msg.videoUrl} 
+                               controls 
+                               className="w-full max-h-48 object-contain"
+                             />
+                             <a 
+                               href={msg.videoUrl} 
+                               download 
+                               className="flex w-full items-center justify-center gap-2 rounded-b-xl border-t border-white/10 bg-white/5 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition"
+                             >
+                               <Download className="h-3 w-3" /> Download Video
+                             </a>
+                           </div>
+                         )}
+                         
+                         {msg.text}
+                         
+                         {msg.htmlPreviewData && msg.htmlPreviewFilename && (
                           <div className="mt-3 grid grid-cols-1 gap-2">
                             <a 
                               href={msg.htmlPreviewData} 
