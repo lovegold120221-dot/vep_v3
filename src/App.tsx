@@ -273,6 +273,18 @@ const DEFAULT_SETTINGS: AgentSettings = {
 
 const GOOGLE_SERVICE_TOOLS =[
   {
+    name: 'update_knowledge_base',
+    description: 'Save a new skill or long-term memory to the knowledge base. Use this when the user wants you to learn a new capability, remember a specific preference, or define a custom "skill" for future use.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        skillName: { type: Type.STRING, description: 'The name of the skill or memory (e.g., "Expert Budgeting", "Boss Preferences").' },
+        instructions: { type: Type.STRING, description: 'The detailed instructions, rules, or facts that define this skill or memory.' },
+      },
+      required: ['skillName', 'instructions'],
+    },
+  },
+  {
     name: 'read_knowledge_base',
     description: 'Read the contents of the user\'s uploaded custom Knowledge Base documents. Use this when the user asks about their custom data, projects, study notes, or business context.',
     parameters: {
@@ -2444,6 +2456,16 @@ function BeatriceAgent({
           };
         }
 
+        case 'update_knowledge_base': {
+          const newEntry = `\n\n[SKILL/MEMORY: ${args.skillName}]\n${args.instructions}`;
+          setSettings(s => ({ ...s, knowledgeBase: (s.knowledgeBase || '') + newEntry }));
+          return { 
+            toolName, 
+            executedAt, 
+            status: 'completed', 
+            summary: `Successfully saved skill "${args.skillName}" to long-term memory.` 
+          };
+        }
         case 'maps_search_places': {
           const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
           if (!apiKey) throw new Error("VITE_GOOGLE_API_KEY is missing. Add it to your environment variables to use Google Maps Platform.");
