@@ -28,6 +28,7 @@ import {
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from '@google/genai';
 import { AudioRecorder, AudioStreamer } from './lib/audio';
 import { BASE_LIVE_AGENT_PROMPT, BIBLE_PERSONALITY } from './lib/personality';
+import { generateAssistantVideo } from './lib/video-generation';
 import {
   Loader2,
   Power,
@@ -59,7 +60,6 @@ import {
   Globe
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { experimental_generateVideo as generateVideo } from 'ai';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -87,6 +87,7 @@ interface ActionTask {
   downloadFilename?: string;
   htmlPreviewData?: string;
   htmlPreviewFilename?: string;
+  videoUrl?: string;
 }
 
 interface AgentSettings {
@@ -286,7 +287,12 @@ const GOOGLE_SERVICE_TOOLS =[
       type: Type.OBJECT,
       properties: {
         prompt: { type: Type.STRING, description: 'Detailed description of the video to generate.' },
-        imageUrl: { type: Type.STRING, description: 'Optional public URL of the starting image.' },
+        imageUrl: { type: Type.STRING, description: 'Optional starting image as a data URL, HTTPS image URL, or gs:// URI.' },
+        useLastAttachedImage: { type: Type.BOOLEAN, description: 'Use the most recently uploaded image as the first frame when the user says this image, this photo, product photo, or attached image.' },
+        aspectRatio: { type: Type.STRING, description: 'Use 9:16 for mobile ads/reels/stories or 16:9 for landscape videos.' },
+        durationSeconds: { type: Type.NUMBER, description: 'Desired clip duration in seconds. Keep at 8 or lower.' },
+        negativePrompt: { type: Type.STRING, description: 'Visual/audio qualities to avoid.' },
+        generateAudio: { type: Type.BOOLEAN, description: 'Whether to generate native audio with the video.' },
       },
       required: ['prompt'],
     },
@@ -2001,6 +2007,7 @@ function BeatriceAgent({
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
   const audioRecorderRef = useRef<AudioRecorder | null>(null);
   const pendingToolCallsRef = useRef<any[] | null>(null);
+  const latestImageAttachmentRef = useRef<{ name: string; dataUrl: string } | null>(null);
 
   const transcriptTimeoutRef = useRef<any>(null);
   const isMutedRef = useRef(false);
@@ -2259,18 +2266,21 @@ function BeatriceAgent({
               htmlPreviewFilename: result.htmlPreviewFilename
             }
           : makeDownloadFile(result, toolName);
+        const media = result.videoUrl ? { videoUrl: result.videoUrl } : {};
 
         setTasks(p => p.map(t => t.id === tid ? {
           ...t,
           status: 'completed',
-          result: result.note || `Completed: ${toolName}`,
-          ...download
+          result: result.note || result.summary || `Completed: ${toolName}`,
+          ...download,
+          ...media
         } : t));
 
-        saveMessage('model', result.note || `Tool result from ${toolName}: completed.`, {
+        saveMessage('model', result.note || result.summary || `Tool result from ${toolName}: completed.`, {
           toolName,
           toolResult: result,
-          ...download
+          ...download,
+          ...media
         });
 
         setTimeout(() => setTasks(p => p.filter(t => t.id !== tid)), 16000);
@@ -2474,45 +2484,33 @@ function BeatriceAgent({
           };
         }
         case 'generate_video': {
-          let finalImageUrl = args.imageUrl;
-          if (finalImageUrl && finalImageUrl.startsWith('data:')) {
-            const fileName = `start-frame-${Date.now()}.jpg`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('videos')
-              .upload(`inputs/${fileName}`, decodeURIComponent(finalImageUrl.split(',')[1]), {
-                contentType: 'image/jpeg',
-              });
-            if (uploadError) throw new Error(`Image upload failed: ${uploadError.message}`);
-            const { data: { publicUrl } } = supabase.storage.from('videos').getPublicUrl(uploadData?.path || `inputs/${fileName}`);
-            finalImageUrl = publicUrl;
-          }
+          if (!aiRef.current) throw new Error('Gemini client is not initialized. Add VITE_GEMINI_API_KEY and restart the app.');
 
-          const result = await (generateVideo as any)({
-            model: 'bytedance/seedance-2.0-fast',
-            prompt: args.prompt,
-            image: finalImageUrl ? { url: finalImageUrl } : undefined,
+          const prompt = String(args.prompt || '').trim();
+          const wantsLatestImage =
+            Boolean(args.useLastAttachedImage) ||
+            /\b(this|attached|uploaded|image|photo|picture|product|first frame|start frame)\b/i.test(prompt);
+          const imageUrl = args.imageUrl || (wantsLatestImage ? latestImageAttachmentRef.current?.dataUrl : undefined);
+          const generatedVideo = await generateAssistantVideo(aiRef.current, supabase, {
+            prompt,
+            imageUrl,
+            aspectRatio: args.aspectRatio,
+            durationSeconds: args.durationSeconds,
+            negativePrompt: args.negativePrompt,
+            generateAudio: args.generateAudio,
           });
-
-          const videoResponse = await fetch((result as any).url);
-          const videoBlob = await videoResponse.blob();
-          const videoFileName = `gen-video-${Date.now()}.mp4`;
-          
-          const { data: videoUploadData, error: videoUploadError } = await supabase.storage
-            .from('videos')
-            .upload(`outputs/${videoFileName}`, videoBlob, {
-              contentType: 'video/mp4',
-              upsert: true
-            });
-
-          if (videoUploadError) throw new Error(`Video upload failed: ${videoUploadError.message}`);
-          const { data: { publicUrl: finalVideoUrl } } = supabase.storage.from('videos').getPublicUrl(`outputs/${videoFileName}`);
 
           return { 
             toolName, 
             executedAt, 
             status: 'completed', 
-            videoUrl: finalVideoUrl, 
-            summary: `Generated the video: ${args.prompt}` 
+            videoUrl: generatedVideo.videoUrl,
+            downloadFilename: generatedVideo.downloadFilename,
+            storagePath: generatedVideo.storagePath,
+            sourceUri: generatedVideo.sourceUri,
+            operationName: generatedVideo.operationName,
+            note: `Generated the video: ${prompt}`,
+            summary: `Generated the video: ${prompt}` 
           };
         }
         case 'maps_search_places': {
@@ -2919,6 +2917,7 @@ function BeatriceAgent({
         `Agent personality overlay from settings page. This is customizable and must sit on top of the constant base prompt without replacing it: ${settings.personality}.`,
         `Selected visible voice alias: ${selectedVoiceMeta.alias}. Internal voice id: ${selectedVoiceMeta.id}. Voice vibe: ${selectedVoiceMeta.vibe}. Do not mention the internal voice id unless asked by the developer.`,
         `When asked to create, build, render, showcase, prototype, code, animate, make slides, make forms, make dashboards, make pages, make Three.js demos, invoices, or make printable documents, call the appropriate generation tool (like create_invoice_document, generate_data_dashboard, or render_web_artifact). Never just describe the code if the user wants it rendered or built. To send an email, explicitly use the gmail_send tool.`,
+        `When asked to generate a video, call generate_video after confirmation. Prefer high-conversion vertical ad defaults with aspectRatio "9:16" unless Boss asks for landscape. If Boss says "this image", "this photo", or "this product", pass useLastAttachedImage: true.`,
         `For HTML/CSS/JS artifacts, include all CSS in <style> and all JS in <script>. Make it directly openable. For documents, include print CSS and a print button. For Three.js, load Three.js from a CDN and keep everything in one HTML file.`,
         
         `=== TOOL EXECUTION & CONFIRMATION RULES ===`,
@@ -3204,6 +3203,7 @@ function BeatriceAgent({
           
           const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
           const base64Data = dataUrl.split(',')[1];
+          latestImageAttachmentRef.current = { name: safeName, dataUrl };
           
           saveMessage('user', `[Attached Image: ${safeName}]`, {
             fileName: safeName,
@@ -3632,6 +3632,18 @@ Tasks:
                          className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
                        >
                         <Download className="h-4 w-4" />
+                      </a> 
+                    )}
+
+                    {task.videoUrl && ( 
+                       <a 
+                         href={task.videoUrl} 
+                         target="_blank" 
+                         rel="noreferrer"
+                         title="Open Video"
+                         className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
+                       >
+                        <Video className="h-4 w-4" />
                       </a> 
                     )}
                   </motion.div>

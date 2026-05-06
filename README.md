@@ -15,6 +15,8 @@ View your app in AI Studio: https://ai.studio/apps/ca79bb92-63d8-4532-a139-e0849
 
 1. Install dependencies:
    `npm install`
-2. Set the `VITE_GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set the `VITE_GEMINI_API_KEY`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` in [.env.local](.env.local)
+   - Video generation defaults are in [.env.example](.env.example)
+   - The Supabase Storage bucket named `videos` must exist and be publicly readable for generated video playback
 3. Run the app:
    `npm run dev`
