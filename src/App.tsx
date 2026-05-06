@@ -2065,6 +2065,8 @@ function BeatriceAgent({
   const hasGeneratedVideoRef = useRef<boolean>(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const isVoiceActiveRef = useRef(false);
+  const sessionStartTimeRef = useRef<number>(0);
+  const [sessionElapsed, setSessionElapsed] = useState(0);
 
   useEffect(() => {
     isVoiceActiveRef.current = isVoiceActive;
@@ -2078,9 +2080,27 @@ function BeatriceAgent({
     isActiveRef.current = isActive; 
   }, [isActive]);
 
-  useEffect(() => { 
-    isAgentSpeakingRef.current = isAgentSpeaking; 
+  useEffect(() => {
+    isAgentSpeakingRef.current = isAgentSpeaking;
   }, [isAgentSpeaking]);
+
+  useEffect(() => {
+    if (isActive && sessionStartTimeRef.current === 0) {
+      sessionStartTimeRef.current = Date.now();
+    }
+    if (!isActive) {
+      sessionStartTimeRef.current = 0;
+      setSessionElapsed(0);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive || sessionStartTimeRef.current === 0) return;
+    const interval = setInterval(() => {
+      setSessionElapsed(Math.floor((Date.now() - sessionStartTimeRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isActive]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -3742,20 +3762,19 @@ Tasks:
             speakerBands={speakerBands}
           />
 
-          {isVoiceActive && isActive && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-2"
-            >
-              <span className="font-mono text-[14px] tracking-widest text-lime-300">
-                ။‖‖‖။
+          <div className="mt-6 flex items-center gap-3 rounded-full border border-lime-300/20 bg-lime-300/5 px-5 py-2">
+            <span className={`font-mono text-[14px] tracking-widest ${isActive ? 'text-lime-300' : 'text-zinc-500'}`}>
+              ။‖‖‖။
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-lime-300' : 'text-zinc-500'}`}>
+              {isActive ? 'Voice Active' : 'Inactive'}
+            </span>
+            {isActive && (
+              <span className="font-mono text-[10px] text-lime-300/70">
+                {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(sessionElapsed % 60).padStart(2, '0')}
               </span>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-lime-300/80">
-                Continue speaking...
-              </span>
-            </motion.div>
-          )}
+            )}
+          </div>
 
           <AnimatePresence>
             {currentTranscript && ( 
@@ -3919,6 +3938,15 @@ Tasks:
                   <MessageCircle className="h-4 w-4 text-lime-300" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
                 </div>
+                {isActive && (
+                  <div className="flex items-center gap-2 rounded-full border border-lime-300/30 bg-lime-300/10 px-3 py-1">
+                    <span className="font-mono text-[10px] tracking-widest text-lime-300">။‖‖‖။</span>
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-lime-300">Voice Active</span>
+                    <span className="font-mono text-[8px] text-lime-300/70">
+                      {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(sessionElapsed % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={() => setShowSidebar(false)}
                   className="-mr-2 rounded-xl p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
