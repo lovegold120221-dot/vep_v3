@@ -288,17 +288,15 @@ const DEFAULT_SETTINGS: AgentSettings = {
 const GOOGLE_SERVICE_TOOLS =[
   {
     name: 'generate_video',
-    description: 'Generate a high-quality video based on a text prompt and an optional starting image. Use this when the user asks to create a video, animation, or visual scene. If the user provides an image, use it as the reference frame.',
+    description: 'Generate a stunning, cinematic video using ByteDance Seedance 2.0. Transform the user prompt into an enhanced version with vivid visual descriptions, dramatic lighting, a catchy tagline, appropriate BGM style, and voiceover direction. Include the starting image if provided. Returns a downloadable video preview that auto-plays in the chat.',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        prompt: { type: Type.STRING, description: 'Detailed description of the video to generate.' },
-        imageUrl: { type: Type.STRING, description: 'Optional starting image as a data URL, HTTPS image URL, or gs:// URI.' },
-        useLastAttachedImage: { type: Type.BOOLEAN, description: 'Use the most recently uploaded image as the first frame when the user says this image, this photo, product photo, or attached image.' },
-        aspectRatio: { type: Type.STRING, description: 'Use 9:16 for mobile ads/reels/stories or 16:9 for landscape videos.' },
-        durationSeconds: { type: Type.NUMBER, description: 'Desired clip duration in seconds. Keep at 8 or lower.' },
-        negativePrompt: { type: Type.STRING, description: 'Visual/audio qualities to avoid.' },
-        generateAudio: { type: Type.BOOLEAN, description: 'Whether to generate native audio with the video.' },
+        prompt: { type: Type.STRING, description: 'Enhanced video prompt with visual scene description, tagline, BGM style, and voiceover direction.' },
+        imageUrl: { type: Type.STRING, description: 'Optional starting image as a data URL.' },
+        useLastAttachedImage: { type: Type.BOOLEAN, description: 'Use the most recently uploaded image as the first frame.' },
+        aspectRatio: { type: Type.STRING, description: 'Use 9:16 for vertical/reels or 16:9 for landscape.' },
+        durationSeconds: { type: Type.NUMBER, description: 'Duration in seconds (max 6).' },
       },
       required: ['prompt'],
     },
@@ -2991,7 +2989,7 @@ function BeatriceAgent({
         `Agent personality overlay from settings page. This is customizable and must sit on top of the constant base prompt without replacing it: ${settings.personality}.`,
         `Selected visible voice alias: ${selectedVoiceMeta.alias}. Internal voice id: ${selectedVoiceMeta.id}. Voice vibe: ${selectedVoiceMeta.vibe}. Do not mention the internal voice id unless asked by the developer.`,
         `When asked to create, build, render, showcase, prototype, code, animate, make slides, make forms, make dashboards, make pages, make Three.js demos, invoices, or make printable documents, call the appropriate generation tool (like create_invoice_document, generate_data_dashboard, or render_web_artifact). Never just describe the code if the user wants it rendered or built. To send an email, explicitly use the gmail_send tool.`,
-        `When asked to generate a video, first check if the user has provided an image to use as the starting frame. If no image is attached and they want to use their own image, tell them: "Attach the image you want to use as the first frame by clicking the attachment button and selecting your image, then ask me to generate the video again." If an image is already attached, call generate_video with useLastAttachedImage: true. Default to vertical 9:16 aspect ratio unless user asks for landscape.`,
+        `When asked to generate a video, transform the user's prompt into a professionally enhanced video prompt for ByteDance Seedance 2.0. Your enhancement must include: (1) A vivid, cinematic description of the main subject and scene with dramatic lighting and atmosphere, (2) A catchy brand tagline or caption that captures the essence of the video in 3-7 words, (3) Recommended background music style (e.g. cinematic ambient, upbeat corporate, emotional piano, tropical vibes), (4) Voice-over direction if applicable (e.g. "deep male voiceover", "energetic female announcer", "no voiceover"). Structure your enhanced prompt as: [VISUAL SCENE: describe in detail with lighting, camera angle, mood], [TAGLINE: 3-7 word catchy caption], [BGM: music style], [VOICEOVER: direction if any]. If the user provides an image, use it as the starting frame. Default to 9:16 vertical format. Call generate_video tool with the enhanced prompt.`,
         `For HTML/CSS/JS artifacts, include all CSS in <style> and all JS in <script>. Make it directly openable. For documents, include print CSS and a print button. For Three.js, load Three.js from a CDN and keep everything in one HTML file.`,
         
         `=== TOOL EXECUTION & CONFIRMATION RULES ===`,
@@ -3961,22 +3959,32 @@ Tasks:
                            </div> 
                          )}
                          
-                         {msg.videoUrl && (
-                           <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-black">
-                             <video 
-                               src={msg.videoUrl} 
-                               controls 
-                               className="w-full max-h-48 object-contain"
-                             />
-                             <a 
-                               href={msg.videoUrl} 
-                               download 
-                               className="flex w-full items-center justify-center gap-2 rounded-b-xl border-t border-white/10 bg-white/5 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition"
-                             >
-                               <Download className="h-3 w-3" /> Download Video
-                             </a>
-                           </div>
-                         )}
+{msg.videoUrl && (
+                            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black">
+                              <video
+                                src={msg.videoUrl}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full object-contain"
+                                style={{ maxHeight: '320px' }}
+                              />
+                              <div className="flex items-center justify-between border-t border-white/10 bg-white/5 px-4 py-3">
+                                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-lime-300">
+                                  <Video className="h-4 w-4" /> Video Generated
+                                </div>
+                                <a
+                                  href={msg.videoUrl}
+                                  download
+                                  className="flex items-center gap-2 rounded-lg bg-lime-300/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-lime-300 transition hover:bg-lime-300/20"
+                                >
+                                  <Download className="h-3.5 w-3.5" /> Download
+                                </a>
+                              </div>
+                            </div>
+                          )}
                          
                          {msg.text}
                          
