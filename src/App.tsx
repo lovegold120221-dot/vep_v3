@@ -58,7 +58,8 @@ import {
   Database,
   Trash2,
   Globe,
-  Settings
+  Settings,
+  MessageCircle
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -3655,14 +3656,15 @@ Tasks:
       </AnimatePresence>
 
       <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-8 py-6 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
-        <div className="flex items-center gap-4">
-           <button 
-             onClick={() => setShowSidebar(true)} 
+<div className="flex items-center gap-4">
+           <button
+             onClick={() => setShowSidebar(true)}
              className="-ml-2 rounded-xl border border-white/10 p-2 text-zinc-400 transition-all hover:bg-white/5 hover:text-white"
-             aria-label="Open Sidebar"
+             aria-label="Open Chat"
            >
-            <Menu className="h-5 w-5" />
-          </button>
+            <MessageCircle className="block h-5 w-5 sm:hidden" />
+            <Menu className="hidden h-5 w-5 sm:block" />
+           </button>
           
           <div className="hidden items-center gap-3 sm:flex">
             <img src={EBURON_LOGO_URL} alt="Eburon" className="h-8 w-8 rounded-full object-cover" />
@@ -3872,12 +3874,12 @@ Tasks:
               className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm" 
             />
             
-            <motion.div 
-              initial={{ x: '-100%' }} 
-              animate={{ x: 0 }} 
-              exit={{ x: '-100%' }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }} 
-              className="fixed bottom-0 left-0 top-0 z-[101] flex w-96 max-w-[88vw] flex-col border-r border-white/10 bg-[#0A0A0B] shadow-2xl"
+<motion.div 
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-0 z-[101] flex w-full flex-col border-r border-white/10 bg-[#0A0A0B] shadow-2xl sm:bottom-0 sm:top-auto sm:left-0 sm:w-96 sm:max-w-[88vw] sm:rounded-t-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/10 p-6">
                 <div>
