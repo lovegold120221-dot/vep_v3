@@ -3934,7 +3934,7 @@ Tasks:
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl"
+              className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl sm:inset-y-0 sm:left-0 sm:w-full sm:max-w-lg sm:mx-auto sm:rounded-none"
             >
               <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur-xl">
                 <div className="flex items-center gap-2">
