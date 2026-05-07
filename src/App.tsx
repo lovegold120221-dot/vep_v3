@@ -1531,7 +1531,7 @@ function MeetingRecorderModal({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col bg-[#050505] p-6 sm:p-12 items-center justify-center">
+    <div className="fixed inset-0 z-[300] flex flex-col bg-[#050505] p-6 pt-[max(24px,env(safe-area-inset-top))] pb-[max(24px,env(safe-area-inset-bottom))] items-center justify-center">
       <div className="w-full h-full flex flex-col max-w-5xl items-center justify-center">
         {isProcessing ? (
            <div className="flex flex-col items-center py-20 text-center">
@@ -3610,7 +3610,7 @@ Tasks:
   };
 
     return (
-      <div className="relative flex h-[100dvh] min-h-screen flex-col overflow-hidden bg-[#020203] text-zinc-300 selection:bg-lime-300/30">
+      <div className="relative flex h-[100dvh] min-h-screen flex-col overflow-hidden bg-[#020203] text-zinc-300 selection:bg-lime-300/30 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <canvas ref={canvasRef} className="hidden" />
 
        <input 
@@ -3667,7 +3667,7 @@ Tasks:
               <span className="text-[9px] font-bold uppercase tracking-widest text-lime-200">Camera Live</span>
             </div>
             
-            <div className="pointer-events-auto absolute bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-4">
+            <div className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
               <button 
                 onClick={switchCamera} 
                 className="rounded-full border border-white/10 bg-black/60 px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-200 backdrop-blur-xl transition hover:border-lime-300/40 hover:text-lime-200"
@@ -3793,7 +3793,7 @@ Tasks:
             )}
           </AnimatePresence>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-8 z-50 flex flex-col items-center justify-end">
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 z-50 flex flex-col items-center justify-end pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="mb-4 w-full max-w-md space-y-2 px-6">
               <AnimatePresence>
                 {tasks.map(task => (
@@ -3931,9 +3931,9 @@ Tasks:
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl sm:inset-y-0 sm:left-0 sm:w-full sm:max-w-lg sm:mx-auto sm:rounded-none"
+              className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl"
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur-xl pt-[max(12px,env(safe-area-inset-top))]">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="h-4 w-4 text-lime-300" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
@@ -3956,7 +3956,7 @@ Tasks:
                 </button>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-0 flex-1 flex-col pb-[max(16px,env(safe-area-inset-bottom))]">
                 <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-3">
                   {historyMsgs.map((msg, i) => (
                     <div
@@ -4317,7 +4317,7 @@ Tasks:
               </div>
             </div>
             
-            <div className="fixed bottom-0 left-0 right-0 z-[220] border-t border-white/10 bg-[#050505]/90 p-4 backdrop-blur-xl">
+            <div className="fixed bottom-0 left-0 right-0 z-[220] border-t border-white/10 bg-[#050505]/90 p-4 backdrop-blur-xl pb-[max(16px,env(safe-area-inset-bottom))]">
               <div className="mx-auto flex w-full max-w-2xl gap-3">
                 <button 
                   onClick={onLogout} 
