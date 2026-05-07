@@ -28,7 +28,14 @@ import {
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from '@google/genai';
 import { AudioRecorder, AudioStreamer } from './lib/audio';
 import { VoiceAnalyzer } from './lib/voice-analysis';
-import { saveVoiceProfile, loadVoiceProfile, updateVoiceProfileGender } from './lib/voice-profile';
+import {
+  loadLearnedPhrases,
+  loadLastConversationContext,
+  saveToSupabaseMemory,
+  saveVoiceProfileData,
+  loadVoiceProfileData,
+  updateVoiceProfileGenderData,
+} from './lib/supabase-memory';
 import { BASE_LIVE_AGENT_PROMPT, BIBLE_PERSONALITY } from './lib/personality';
 import { generateAssistantVideo } from './lib/video-generation';
 import {
@@ -2039,64 +2046,6 @@ function BeatriceAgent({
   const lastSavedUserTranscriptRef = useRef('');
   const stopSessionRef = useRef<() => void>(() => {});
 
-  const loadLearnedPhrases = async (uid: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_memory')
-        .select('message')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(200);
-
-      if (error) return;
-
-      const phrases: string[] = [];
-      const seen = new Set<string>();
-
-      (data || []).forEach((row: any) => {
-        const text = row.message?.trim();
-        if (!text || text.length < 10 || text.length > 200) return;
-        const words = text.split(/\s+/);
-        if (words.length >= 3 && words.length <= 15) {
-          const key = text.toLowerCase().slice(0, 40);
-          if (!seen.has(key)) {
-            seen.add(key);
-            phrases.push(text);
-          }
-        }
-      });
-
-      learnedPhrasesRef.current = phrases;
-    } catch (e) {
-      console.error('Failed to load learned phrases:', e);
-    }
-  };
-
-  const loadLastConversationContext = async (uid: string): Promise<string> => {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_memory')
-        .select('message, created_at')
-        .eq('user_id', uid)
-        .eq('role', 'user')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error || !data || data.length === 0) return '';
-
-      const recentMessages = data.map((r: any) => r.message?.trim()).filter(Boolean);
-      if (recentMessages.length === 0) return '';
-
-      const lastMsg = recentMessages[0];
-      if (!lastMsg || lastMsg.length < 5) return '';
-
-      const preview = lastMsg.length > 80 ? lastMsg.slice(0, 80) + '...' : lastMsg;
-      return `Boss mentioned: "${preview}"`;
-    } catch (e) {
-      return '';
-    }
-  };
-
   const userSilenceStartRef = useRef<number | null>(null);
   const lastFillerTimeRef = useRef<number>(0);
   const isUserSpeakingRef = useRef(false);
@@ -2244,22 +2193,7 @@ function BeatriceAgent({
     }
 
     if (settings.saveConversationHistory) {
-      saveToSupabaseMemory(user.uid, user.email || '', role, clean).catch(console.error);
-    }
-  };
-
-  const saveToSupabaseMemory = async (uid: string, email: string, role: 'user' | 'model', text: string) => {
-    try {
-      const { error } = await supabase.from('conversation_memory').insert({
-        user_id: uid,
-        user_email: email,
-        role,
-        message: text,
-        created_at: new Date().toISOString(),
-      });
-      if (error) console.error('Supabase save error:', error);
-    } catch (e) {
-      console.error('Supabase save failed:', e);
+      saveToSupabaseMemory(user.uid, user.email || '', role, clean);
     }
   };
 
@@ -3304,9 +3238,11 @@ case 'generate_video': {
       startMicVisualizer();
 
       if (user) {
-        loadLearnedPhrases(user.uid);
+        loadLearnedPhrases(user.uid).then((phrases) => {
+          learnedPhrasesRef.current = phrases;
+        });
         voiceAnalyzerRef.current = new VoiceAnalyzer();
-        loadVoiceProfile(supabase, user.uid).then((profile) => {
+        loadVoiceProfileData(user.uid).then((profile) => {
           if (profile && voiceAnalyzerRef.current) {
             voiceAnalyzerRef.current.setStoredProfile(profile);
           }
@@ -3654,10 +3590,10 @@ case 'generate_video': {
     if (voiceAnalyzerRef.current && user && voiceAnalyzerRef.current.getProfileSampleCount() >= 8) {
       const vector = voiceAnalyzerRef.current.getProfileVector();
       if (vector.length > 0) {
-        saveVoiceProfile(supabase, user.uid, vector);
+        saveVoiceProfileData(user.uid, vector);
         const analysis = currentVoiceAnalysisRef.current;
         if (analysis && analysis.gender !== 'unknown') {
-          updateVoiceProfileGender(supabase, user.uid, analysis.gender as 'male' | 'female' | 'unknown');
+          updateVoiceProfileGenderData(user.uid, analysis.gender as 'male' | 'female' | 'unknown');
         }
       }
     }
