@@ -3070,6 +3070,15 @@ case 'generate_video': {
         `If a tool fails or returns no results, report that honestly. Do not invent fake data.`,
         `When in doubt: say you don't know, Boss. That is always better than making something up.`,
         `NEVER REPEAT THE SAME SENTENCE OR PHRASE TWICE. Humans don't repeat themselves.`,
+        `=== ANTI-REPETITION & ATTENTIVE LISTENING RULES ===`,
+        `1. VARIETY IS MANDATORY: Never use the same greeting, filler, or response pattern twice in a row. If you said "Got it" last time, say "Understood" or "Right" or just nod silently next time.`,
+        `2. TRACK WHAT YOU JUST SAID: Before speaking, check if you're about to repeat something you said in the last 3 turns. If yes, rephrase or stay silent.`,
+        `3. LISTEN MORE, TALK LESS: Boss speaks more than you do. Your role is to listen attentively and respond only when needed.`,
+        `4. SILENCE IS ACCEPTABLE: Real conversations have pauses. Don't fill every silence with words.`,
+        `5. NO SCRIPTED BEHAVIOR: Don't follow a pattern like [acknowledge] → [ask what next]. Just acknowledge and wait.`,
+        `6. REFERENCE PAST CONVERSATION NATURALLY: When you remember something from before, bring it up casually like a normal person would — "Oh right, like that thing you mentioned" — not formally like you're reading from notes.`,
+        `=== END ANTI-REPETITION RULES ===`,
+        ``,
         `=== VOICE & EMOTIONAL CONTEXT ===`,
         currentVoiceAnalysisRef.current
           ? `Real-time voice analysis of Boss: detected as ${currentVoiceAnalysisRef.current.gender === 'male' ? 'male' : currentVoiceAnalysisRef.current.gender === 'female' ? 'female' : 'unknown gender'}. Current emotional state: ${currentVoiceAnalysisRef.current.emotion} (energy level: ${Math.round(currentVoiceAnalysisRef.current.energy * 100)}%). Adapt your tone and energy to match Boss's emotional state — if Boss sounds energetic or excited, be lively; if calm or tired, be measured; if stressed, be reassuring and efficient.`
@@ -3323,11 +3332,33 @@ case 'generate_video': {
         if (user) {
           introContext = await loadLastConversationContext(user.uid);
         }
-        const baseIntro = `${settings.userName} is here in the office. Start like ${settings.agentName} is already sitting at the desk nearby as the office employee.`;
-        const fullIntro = introContext
-          ? `${baseIntro} ${introContext} Begin in ${settings.selectedLanguage} naturally.`
-          : `${baseIntro} Begin in ${settings.selectedLanguage} naturally and respectfully.`;
-        sendTextToLive(fullIntro);
+
+        // Build a more natural intro prompt that encourages human-like behavior
+        let introPrompt: string;
+
+        if (introContext) {
+          // When we have context, reference it naturally like a colleague continuing a conversation
+          introPrompt = `Boss ${settings.userName} just reconnected. ${introContext}
+
+Start with ONE short, casual line acknowledging this — like a colleague picking up where you left off. Use ${settings.selectedLanguage}.
+
+CRITICAL:
+- ONLY say 1-2 sentences max
+- DO NOT ask "How can I help?" or "What's next?"
+- DO NOT list what you can do
+- Just acknowledge and wait naturally
+- Sound like a normal person, not a helpful assistant`;
+        } else {
+          // No prior context - use a simple, natural greeting
+          const casualOpeners = [
+            `Boss ${settings.userName} just arrived. Greet with ONE casual line like "Hey Boss" or "Morning" — then stop. No offers. No "How can I help?". Just acknowledge presence and wait.`,
+            `Boss ${settings.userName} is here. Say ONE brief hello in ${settings.selectedLanguage} — natural, like a colleague at the next desk. Then wait silently.`,
+            `Boss ${settings.userName} connected. ONE short acknowledgment only. No questions. No offers. Just "Hey Boss" or similar, then stop.`,
+          ];
+          introPrompt = casualOpeners[Math.floor(Math.random() * casualOpeners.length)];
+        }
+
+        sendTextToLive(introPrompt);
       }, 500);
       
     } catch (err) { 

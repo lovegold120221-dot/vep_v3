@@ -15,7 +15,15 @@ export async function loadLearnedPhrases(uid: string): Promise<string[]> {
       .order('created_at', { ascending: false })
       .limit(200);
 
-    if (error || !data) return [];
+    if (error) {
+      // Silently handle RLS errors - learned phrases are optional
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        console.warn('Supabase RLS policy blocked read for learned phrases.');
+      }
+      return [];
+    }
+
+    if (!data) return [];
 
     const phrases: string[] = [];
     const seen = new Set<string>();
@@ -44,26 +52,49 @@ export async function loadLastConversationContext(uid: string): Promise<string> 
   try {
     const { data, error } = await supabase
       .from('conversation_memory')
-      .select('message, created_at')
+      .select('message, role, created_at')
       .eq('user_id', uid)
-      .eq('role', 'user')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(10);
 
-    if (error || !data || data.length === 0) return '';
+    if (error) {
+      // Silently handle RLS errors - conversation memory is optional
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        console.warn('Supabase RLS policy blocked read. To fix this, update your RLS policy in Supabase to allow selects for authenticated users.');
+      }
+      return '';
+    }
 
-    const recentMessages = (data as { message?: string }[])
-      .map((r) => r.message?.trim())
-      .filter(Boolean);
+    if (!data || data.length === 0) return '';
 
-    if (recentMessages.length === 0) return '';
+    // Get the last few exchanges to provide better context
+    const exchanges = (data as { message?: string; role?: string; created_at?: string }[])
+      .slice(0, 6)
+      .reverse();
 
-    const lastMsg = recentMessages[0];
-    if (!lastMsg || lastMsg.length < 5) return '';
+    if (exchanges.length === 0) return '';
 
-    const preview = lastMsg.length > 80 ? lastMsg.slice(0, 80) + '...' : lastMsg;
-    return `Boss mentioned: "${preview}"`;
+    // Build a conversation summary
+    const contextParts: string[] = [];
+    let lastUserTopic = '';
+
+    for (const exchange of exchanges) {
+      const msg = exchange.message?.trim();
+      if (!msg || msg.length < 3) continue;
+
+      if (exchange.role === 'user') {
+        lastUserTopic = msg;
+      }
+    }
+
+    if (lastUserTopic) {
+      const preview = lastUserTopic.length > 100 ? lastUserTopic.slice(0, 100) + '...' : lastUserTopic;
+      contextParts.push(`Last time Boss mentioned: "${preview}"`);
+    }
+
+    return contextParts.join('. ');
   } catch (e) {
+    console.error('Failed to load conversation context:', e);
     return '';
   }
 }
@@ -83,6 +114,12 @@ export async function saveToSupabaseMemory(
       created_at: new Date().toISOString(),
     });
     if (error) {
+      // Silently handle RLS policy errors - this is expected if the user hasn't
+      // set up the proper RLS policies in their Supabase dashboard
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        console.warn('Supabase RLS policy blocked insert. Conversation memory not saved. To fix this, update your RLS policy in Supabase to allow inserts for authenticated users.');
+        return false;
+      }
       console.error('Supabase save error:', error);
       return false;
     }
