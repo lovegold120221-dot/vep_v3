@@ -3713,7 +3713,7 @@ Tasks:
       <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-6 py-4 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
         <button
           onClick={() => setShowSidebar(!showSidebar)}
-          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 ${
             showSidebar
               ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
               : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
@@ -3734,7 +3734,7 @@ Tasks:
 
         <button
           onClick={() => setShowProfile(true)}
-          className="h-10 w-10 overflow-hidden rounded-full border border-white/10 transition-all hover:border-lime-300/50 focus:outline-none focus:ring-2 focus:ring-lime-300/50"
+          className="h-10 w-10 overflow-hidden rounded-full border border-white/10 transition-all hover:border-lime-300/50 focus:outline-none focus:ring-2 focus:ring-lime-300/50 active:scale-95"
         >
           {settings.avatarUrl || user.photoURL ? (
             <img src={settings.avatarUrl || user.photoURL || ''} alt="Profile" className="h-full w-full object-cover" />
@@ -4061,15 +4061,19 @@ Tasks:
                     </div>
                   ))}
                   
-                  {historyMsgs.length === 0 && ( 
-                    <div className="py-10 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-600">
-                      No Office History Yet
-                    </div> 
+                  {historyMsgs.length === 0 && (
+                    <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+                      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                        <MessageCircle className="h-8 w-8 text-zinc-600" />
+                      </div>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">No messages yet</p>
+                      <p className="text-[10px] text-zinc-600">Start a conversation with {settings.agentName}</p>
+                    </div>
                   )}
                   <div ref={messagesEndRef} />
                 </div>
-                
-<form
+
+                <form
                   onSubmit={sendChatMessage}
                   className="border-t border-white/10 bg-[#070807]/95 p-3 backdrop-blur-xl"
                 >
@@ -4077,7 +4081,7 @@ Tasks:
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200 active:scale-95"
                       aria-label="Attach file"
                     >
                       <Paperclip className="h-4 w-4" />
