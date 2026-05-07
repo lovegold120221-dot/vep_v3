@@ -90,6 +90,7 @@ interface ActionTask {
   htmlPreviewData?: string;
   htmlPreviewFilename?: string;
   videoUrl?: string;
+  toolName?: string;
 }
 
 interface AgentSettings {
@@ -1044,12 +1045,12 @@ function buildStunningHtmlContract({
 function OneLineStreamingTranscript({
   text,
   role,
-  name,
 }: {
   text: string;
   role: 'user' | 'model';
-  name: string;
 }) {
+  if (role === 'user') return null;
+
   return (
     <motion.div
       key={`${role}-${text}`}
@@ -1060,26 +1061,10 @@ function OneLineStreamingTranscript({
       className="w-full overflow-hidden px-4"
       style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-center gap-3 overflow-hidden whitespace-nowrap rounded-full border border-lime-300/15 bg-black/35 px-5 py-3 shadow-2xl backdrop-blur-2xl">
-        <span
-          className={`shrink-0 rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-[0.22em] ${
-            role === 'user'
-              ? 'border border-sky-400/20 bg-sky-500/10 text-sky-300'
-              : 'border border-lime-300/25 bg-lime-400/10 text-lime-300'
-          }`}
-        >
-          {role === 'user' ? 'You' : name}
-        </span>
-
-        <div className="min-w-0 flex-1 overflow-hidden">
-          <p
-            className={`truncate text-left text-lg font-medium leading-none tracking-tight md:text-2xl ${
-              role === 'user' ? 'text-sky-100' : 'text-lime-50'
-            }`}
-          >
-            {text}
-          </p>
-        </div>
+      <div className="mx-auto flex max-w-4xl items-center justify-center overflow-hidden rounded-2xl border border-lime-300/15 bg-black/30 px-5 py-2 shadow-2xl backdrop-blur-2xl">
+        <p className="truncate text-left text-sm font-medium leading-tight tracking-tight text-lime-100 md:text-base">
+          {text}
+        </p>
       </div>
     </motion.div>
   );
@@ -2052,12 +2037,73 @@ function BeatriceAgent({
   const lastSavedUserTranscriptRef = useRef('');
   const stopSessionRef = useRef<() => void>(() => {});
 
+  const loadLearnedPhrases = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_memory')
+        .select('message')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) return;
+
+      const phrases: string[] = [];
+      const seen = new Set<string>();
+
+      (data || []).forEach((row: any) => {
+        const text = row.message?.trim();
+        if (!text || text.length < 10 || text.length > 200) return;
+        const words = text.split(/\s+/);
+        if (words.length >= 3 && words.length <= 15) {
+          const key = text.toLowerCase().slice(0, 40);
+          if (!seen.has(key)) {
+            seen.add(key);
+            phrases.push(text);
+          }
+        }
+      });
+
+      learnedPhrasesRef.current = phrases;
+    } catch (e) {
+      console.error('Failed to load learned phrases:', e);
+    }
+  };
+
+  const loadLastConversationContext = async (uid: string): Promise<string> => {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_memory')
+        .select('message, created_at')
+        .eq('user_id', uid)
+        .eq('role', 'user')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error || !data || data.length === 0) return '';
+
+      const recentMessages = data.map((r: any) => r.message?.trim()).filter(Boolean);
+      if (recentMessages.length === 0) return '';
+
+      const lastMsg = recentMessages[0];
+      if (!lastMsg || lastMsg.length < 5) return '';
+
+      const preview = lastMsg.length > 80 ? lastMsg.slice(0, 80) + '...' : lastMsg;
+      return `Boss mentioned: "${preview}"`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const userSilenceStartRef = useRef<number | null>(null);
   const lastFillerTimeRef = useRef<number>(0);
   const isUserSpeakingRef = useRef(false);
   const fillerCheckIntervalRef = useRef<any>(null);
   const lastAudioSendTimeRef = useRef<number>(0);
   const isAgentSpeakingRef = useRef(false);
+  const learnedPhrasesRef = useRef<string[]>([]);
+  const lastLearnedPhraseRef = useRef<string>('');
+  const lastLearnedPhraseTimeRef = useRef<number>(0);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const videoCreditsRef = useRef<number>(2);
@@ -2361,7 +2407,8 @@ function BeatriceAgent({
         id: tid,
         serviceName: toolName,
         action: safeJsonStringify(args || {}),
-        status: 'processing'
+        status: 'processing',
+        toolName
       }]);
 
       try {
@@ -3238,6 +3285,10 @@ case 'generate_video': {
       connectingRef.current = false;
       startMicVisualizer();
 
+      if (user) {
+        loadLearnedPhrases(user.uid);
+      }
+
       fillerCheckIntervalRef.current = setInterval(() => {
         if (!isActiveRef.current || isMutedRef.current || !sessionRef.current) return;
 
@@ -3257,7 +3308,22 @@ case 'generate_video': {
         if (sinceLastFiller < MIN_FILLER_INTERVAL) return;
 
         let filler = '';
-        if (silenceDuration >= LONG_SILENCE_MIN) {
+
+        const learnedPhrases = learnedPhrasesRef.current;
+        if (learnedPhrases.length > 2 && silenceDuration >= MEDIUM_SILENCE_MIN) {
+          const nowMs = Date.now();
+          if (nowMs - lastLearnedPhraseTimeRef.current > 45000) {
+            const available = learnedPhrases.filter(p => p !== lastLearnedPhraseRef.current);
+            if (available.length > 0) {
+              const phrase = available[Math.floor(Math.random() * available.length)];
+              filler = phrase;
+              lastLearnedPhraseRef.current = phrase;
+              lastLearnedPhraseTimeRef.current = nowMs;
+            }
+          }
+        }
+
+        if (!filler && silenceDuration >= LONG_SILENCE_MIN) {
           const longFillers = [
             "Take your time, Boss... I'm here.",
             "No rush, Boss. I'm listening.",
@@ -3265,7 +3331,7 @@ case 'generate_video': {
             "I'll wait, Boss."
           ];
           filler = longFillers[Math.floor(Math.random() * longFillers.length)];
-        } else if (silenceDuration >= MEDIUM_SILENCE_MIN) {
+        } else if (!filler && silenceDuration >= MEDIUM_SILENCE_MIN) {
           const mediumFillers = [
             "You still with me, Boss?",
             "I might have missed you there — are we continuing?",
@@ -3273,7 +3339,7 @@ case 'generate_video': {
             "Mm... take your time."
           ];
           filler = mediumFillers[Math.floor(Math.random() * mediumFillers.length)];
-        } else if (silenceDuration >= SHORT_SILENCE_MIN) {
+        } else if (!filler && silenceDuration >= SHORT_SILENCE_MIN) {
           const shortFillers = [
             "Mm-hmm.",
             "Got it.",
@@ -3290,8 +3356,16 @@ case 'generate_video': {
         }
       }, 1500);
 
-      setTimeout(() => { 
-        sendTextToLive(`${settings.userName} is here in the office. Start like ${settings.agentName} is already sitting at the desk nearby as the office employee. Begin in ${settings.selectedLanguage} normally and respectfully.`); 
+      setTimeout(async () => {
+        let introContext = '';
+        if (user) {
+          introContext = await loadLastConversationContext(user.uid);
+        }
+        const baseIntro = `${settings.userName} is here in the office. Start like ${settings.agentName} is already sitting at the desk nearby as the office employee.`;
+        const fullIntro = introContext
+          ? `${baseIntro} ${introContext} Begin in ${settings.selectedLanguage} naturally.`
+          : `${baseIntro} Begin in ${settings.selectedLanguage} naturally and respectfully.`;
+        sendTextToLive(fullIntro);
       }, 500);
       
     } catch (err) { 
@@ -3721,10 +3795,9 @@ Tasks:
                   exit={{ opacity: 0, y: -12 }} 
                   className="pointer-events-none absolute left-1/2 top-[106px] z-50 w-[92vw] max-w-5xl -translate-x-1/2"
                 >
-                  <OneLineStreamingTranscript 
-                    role={currentTranscript.role} 
-                    text={currentTranscript.text} 
-                    name={settings.agentName} 
+                  <OneLineStreamingTranscript
+                    role={currentTranscript.role}
+                    text={currentTranscript.text}
                   />
                 </motion.div> 
               )}
@@ -3807,10 +3880,9 @@ Tasks:
                 exit={{ opacity: 0, y: -12 }} 
                 className="absolute left-1/2 top-[340px] z-50 w-[92vw] max-w-5xl -translate-x-1/2"
               >
-                <OneLineStreamingTranscript 
-                  role={currentTranscript.role} 
-                  text={currentTranscript.text} 
-                  name={settings.agentName} 
+                <OneLineStreamingTranscript
+                  role={currentTranscript.role}
+                  text={currentTranscript.text}
                 />
               </motion.div> 
             )}
@@ -3820,77 +3892,61 @@ Tasks:
             <div className="mb-4 w-full max-w-md space-y-2 px-6">
               <AnimatePresence>
                 {tasks.map(task => (
-                  <motion.div 
-                    key={task.id} 
-                    layout 
-                    initial={{ opacity: 0, x: -50, scale: 0.9 }} 
-                    animate={{ opacity: 1, x: 0, scale: 1 }} 
-                    exit={{ opacity: 0, x: 50, transition: { duration: 0.2 } }} 
-                    className="flex items-center gap-4 rounded-xl border border-l-2 border-white/5 border-l-lime-300/50 bg-[#0A0A0B]/80 p-3 shadow-2xl backdrop-blur-xl"
+<motion.div
+                    key={task.id}
+                    layout
+                    initial={{ opacity: 0, x: -50, scale: 0.9 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 50, transition: { duration: 0.2 } }}
+                    className="flex items-center gap-3 rounded-xl border border-l-2 border-white/5 border-l-lime-300/50 bg-[#0A0A0B]/80 p-3 shadow-2xl backdrop-blur-xl"
                   >
-                    <div className="relative shrink-0">
-                      {task.status === 'processing' ? ( 
-                        <Loader2 className="h-4 w-4 animate-spin text-lime-300" /> 
-                      ) : task.status === 'completed' ? ( 
-                        <div className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
-                          <Check className="h-2.5 w-2.5 text-black" strokeWidth={4} />
-                        </div> 
-                      ) : ( 
-                        <div className="h-4 w-4 rounded-full bg-red-500" /> 
+                    <div className="relative flex h-8 w-20 shrink-0 flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg bg-black/40">
+                      {task.status === 'processing' && (
+                        <div className="absolute inset-0 bg-lime-300/20" style={{ width: '35%', animation: 'scan 1s ease-in-out infinite alternate' }} />
                       )}
+                      <div className={`h-1.5 w-1.5 rounded-full ${task.status === 'processing' ? 'bg-lime-300 animate-pulse' : task.status === 'completed' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                      <span className={`text-[7px] font-bold uppercase tracking-widest ${task.status === 'processing' ? 'text-lime-300' : task.status === 'completed' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {task.status === 'processing' ? 'Running' : task.status === 'completed' ? 'Done' : 'Failed'}
+                      </span>
                     </div>
-                    
+
                     <div className="min-w-0 flex-1">
-                      <div className="mb-0.5 flex items-center justify-between">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-lime-300">{task.serviceName}</span>
-                        <span className="font-mono text-[8px] text-zinc-600">{task.status.toUpperCase()}</span>
-                      </div>
                       <p className="truncate text-xs text-zinc-100">{task.action}</p>
-                      
-                      {task.result && ( 
-                        <motion.p 
-                          initial={{ opacity: 0, height: 0 }} 
-                          animate={{ opacity: 1, height: 'auto' }} 
-                          className="mt-1 text-[10px] leading-tight text-zinc-400"
-                        >
-                          {task.result}
-                        </motion.p> 
-                      )}
                     </div>
-                    
-                    {task.htmlPreviewData && task.htmlPreviewFilename && ( 
-                       <a 
-                         href={task.htmlPreviewData} 
-                         target="_blank" 
-                         rel="noreferrer" 
-                         title="View Preview"
-                         className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
-                       >
+
+                    {task.htmlPreviewData && task.htmlPreviewFilename && (
+                      <a
+                        href={task.htmlPreviewData}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="View Preview"
+                        className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
+                      >
                         <ExternalLink className="h-4 w-4" />
-                      </a> 
-                    )}
-                    
-                    {task.downloadData && task.downloadFilename && ( 
-                       <a 
-                         href={task.downloadData} 
-                         download={task.downloadFilename} 
-                         title="Download Result"
-                         className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
-                       >
-                        <Download className="h-4 w-4" />
-                      </a> 
+                      </a>
                     )}
 
-                    {task.videoUrl && ( 
-                       <a 
-                         href={task.videoUrl} 
-                         target="_blank" 
-                         rel="noreferrer"
-                         title="Open Video"
-                         className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
-                       >
+                    {task.downloadData && task.downloadFilename && (
+                      <a
+                        href={task.downloadData}
+                        download={task.downloadFilename}
+                        title="Download Result"
+                        className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    )}
+
+                    {task.toolName === 'generate_video' && task.videoUrl && (
+                      <a
+                        href={task.videoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="View Video"
+                        className="pointer-events-auto rounded-lg border border-lime-300/20 p-2 text-lime-200 hover:bg-lime-300/10"
+                      >
                         <Video className="h-4 w-4" />
-                      </a> 
+                      </a>
                     )}
                   </motion.div>
                 ))}
