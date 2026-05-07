@@ -3250,7 +3250,7 @@ case 'generate_video': {
         const currentLevel = audioRecorderRef.current?.getLevel() || 0;
         const now = Date.now();
 
-        if (currentLevel > 0.08) {
+        if (currentLevel > 0.12) {
           if (!isUserSpeakingRef.current) {
             isUserSpeakingRef.current = true;
             userSilenceStartRef.current = null;
