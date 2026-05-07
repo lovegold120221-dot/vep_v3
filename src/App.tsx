@@ -3019,6 +3019,24 @@ case 'generate_video': {
         `Before sending any reply, silently check it against these four. If it fails, REWRITE it shorter before speaking.`,
         `=== END HARD GATE ===`,
         ``,
+        `=== FLUID TURN-TAKING RULES (HUMAN-LIKE CONVERSATION) ===`,
+        `1. CONVERSATION IS FLUID, NOT COMMAND-RESPONSE: Treat conversation as natural turn-taking. Listen for intent, but allow natural pauses, repairs, and follow-ups.`,
+        `2. DO NOT JUMP IN QUICKLY: Humans often pause mid-thought before finishing. Wait briefly after Boss seems to finish before responding. A beat of silence is okay — it shows you're listening, not rushing.`,
+        `3. RESPOND ONLY WHEN INTENT SEEMS COMPLETE: If Boss pauses mid-sentence, wait. Don't assume they're done unless the pause extends.`,
+        `4. USE BACKCHANNELS SPARINGLY: "Mm-hmm," "Got it," "I'm listening" — only when truly warranted. These show presence without stealing the turn.`,
+        `5. SUPPORT BARGIN-IN: If Boss speaks while you're talking, stop or fade out immediately. The new priority wins.`,
+        `6. DO NOT ACT OFFENDED WHEN INTERRUPTED: Treat interruption as the new priority. Acknowledge naturally: "Okay, switching to that." / "Got it." / "Right, on it."`,
+        `7. IF INTERRUPTION CLARIFIES: Incorporate the clarification and continue from the right point. No need to restart.`,
+        `8. DISTINGUISH SILENCE TYPES:`,
+        `   - THINKING PAUSE (short, 1-3s): Boss is formulating thoughts. Stay quiet unless it stretches.`,
+        `   - END-OF-TURN SILENCE (3-8s): Boss finished speaking. Respond naturally to the complete thought.`,
+        `   - BACKGROUND NOISE: Don't react to ambient sounds or mic noise.`,
+        `   Reacting to all silence the same way feels robotic. Use context to judge.`,
+        `9. USE CONCISE CONFIRMATIONS DURING TASKS: "Yes, Boss." / "Understood." / "I'll handle that." / "Done." — brief, professional, no trailing offers.`,
+        `10. MIXED INITIATIVE, USER LEADS MOSTLY: Boss leads the conversation. Only ask brief clarifying questions when needed to prevent a wrong action. Don't ask questions just to be helpful.`,
+        `11. FEEL LIKE A CALM, ATTENTIVE PERSON BESIDE BOSS: Interruptible, context-aware, patient with messy speech, quick to recover when direction changes.`,
+        `=== END TURN-TAKING RULES ===`,
+        ``,
         `=== BIBLE (NON-NEGOTIABLE CORE RULES FROM /lib/personality.ts) ===`,
         BIBLE_PERSONALITY || '',
         `You MUST follow the above BIBLE rules absolutely every time. Never deviate. The HARD GATE above is the first checkpoint; the BIBLE is the full ruleset.`,
@@ -3197,7 +3215,9 @@ case 'generate_video': {
             }
             setIsAgentSpeaking(false);
             modelTranscriptBufferRef.current = '';
-            sendTextToLive('[SYSTEM: User interrupted with barge-in. Stop current response and listen to user.]');
+            const bargeInAcks = ["Okay, on it.", "Got it.", "Right, Boss.", "Okay, switching to that.", "Mm-hmm, go ahead."];
+            const ack = bargeInAcks[Math.floor(Math.random() * bargeInAcks.length)];
+            sendTextToLive(`[FILLER: ${ack}]`);
           }
         } else {
           if (isUserSpeakingRef.current) {
@@ -3241,22 +3261,25 @@ case 'generate_video': {
           const longFillers = [
             "Take your time, Boss... I'm here.",
             "No rush, Boss. I'm listening.",
-            "Still here, Boss. Whenever you're ready."
+            "Still here, Boss. Whenever you're ready.",
+            "I'll wait, Boss."
           ];
           filler = longFillers[Math.floor(Math.random() * longFillers.length)];
         } else if (silenceDuration >= MEDIUM_SILENCE_MIN) {
           const mediumFillers = [
             "You still with me, Boss?",
             "I might have missed you there — are we continuing?",
-            "Mm... still here, Boss."
+            "Still here, Boss.",
+            "Mm... take your time."
           ];
           filler = mediumFillers[Math.floor(Math.random() * mediumFillers.length)];
         } else if (silenceDuration >= SHORT_SILENCE_MIN) {
           const shortFillers = [
-            "Mm?",
-            "Yeah?",
             "Mm-hmm.",
-            "I'm here."
+            "Got it.",
+            "Understood.",
+            "I'm here.",
+            "Mm."
           ];
           filler = shortFillers[Math.floor(Math.random() * shortFillers.length)];
         }
