@@ -70,10 +70,7 @@ import {
   Trash2,
   Globe,
   Settings,
-  MessageCircle,
-  Radio,
-  Plus,
-  ChevronRight
+  MessageCircle
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -2024,7 +2021,6 @@ function BeatriceAgent({
   const [showProfile, setShowProfile] = useState(false);
   const[showMeetingRecorder, setShowMeetingRecorder] = useState(false);
   const [chatInput, setChatInput] = useState('');
-  const[isRecordingPrompt, setIsRecordingPrompt] = useState(false);
   const[settings, setSettings] = useState<AgentSettings>({ ...DEFAULT_SETTINGS, ...initialSettings });
 
   const aiRef = useRef<GoogleGenAI | null>(null);
@@ -2045,10 +2041,6 @@ function BeatriceAgent({
   const videoIntervalRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const knowledgeBaseInputRef = useRef<HTMLInputElement | null>(null);
-  const audioPromptRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioPromptChunksRef = useRef<Blob[]>([]);
-  const audioPromptStreamRef = useRef<MediaStream | null>(null);
-  const speechRecognitionRef = useRef<any>(null);
 
   const modelTranscriptBufferRef = useRef('');
   const userTranscriptBufferRef = useRef('');
@@ -2445,89 +2437,6 @@ function BeatriceAgent({
     }
     
     setChatInput('');
-  };
-
-  const startAudioPromptRecording = async () => {
-    if (isRecordingPrompt) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      audioPromptStreamRef.current = stream;
-      audioPromptChunksRef.current = [];
-
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = settings.selectedLanguage === 'English' ? 'en-US' : settings.selectedLanguage === 'Filipino' ? 'fil-PH' : settings.selectedLanguage;
-
-        recognition.onresult = (event: any) => {
-          let interim = '';
-          let final = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              final += event.results[i][0].transcript + ' ';
-            } else {
-              interim += event.results[i][0].transcript;
-            }
-          }
-          if (final) {
-            const text = final.trim();
-            if (text) {
-              setChatInput((prev) => prev + text);
-            }
-          }
-        };
-
-        recognition.onend = () => {
-          setIsRecordingPrompt(false);
-        };
-
-        recognition.onerror = () => {
-          setIsRecordingPrompt(false);
-        };
-
-        recognition.start();
-        speechRecognitionRef.current = recognition;
-        setIsRecordingPrompt(true);
-      } else {
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioPromptChunksRef.current.push(e.data);
-        };
-        mediaRecorder.onstop = async () => {
-          const blob = new Blob(audioPromptChunksRef.current, { type: 'audio/webm' });
-          const reader = new FileReader();
-          reader.onload = () => {
-            // placeholder - STT would go here
-            setIsRecordingPrompt(false);
-          };
-          reader.readAsDataURL(blob);
-        };
-        mediaRecorder.start();
-        audioPromptRecorderRef.current = mediaRecorder;
-        setIsRecordingPrompt(true);
-      }
-    } catch (e) {
-      console.error('Audio prompt recording failed:', e);
-      setIsRecordingPrompt(false);
-    }
-  };
-
-  const stopAudioPromptRecording = () => {
-    if (speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop();
-      speechRecognitionRef.current = null;
-    }
-    if (audioPromptRecorderRef.current) {
-      audioPromptRecorderRef.current.stop();
-      audioPromptRecorderRef.current = null;
-    }
-    if (audioPromptStreamRef.current) {
-      audioPromptStreamRef.current.getTracks().forEach((t) => t.stop());
-      audioPromptStreamRef.current = null;
-    }
-    setIsRecordingPrompt(false);
   };
 
   const googleFetch = async (url: string, options: RequestInit = {}) => {
@@ -3884,42 +3793,60 @@ Tasks:
         )}
       </AnimatePresence>
 
-      <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-4 py-3 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
+      <header className={`z-50 flex items-center justify-between border-b border-white/5 bg-[#050505]/80 px-6 py-4 backdrop-blur-md ${isVideoEnabled ? 'pointer-events-none opacity-0' : ''}`}>
         <button
           onClick={() => setShowSidebar(!showSidebar)}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-zinc-400 transition hover:border-white/30 hover:text-white active:scale-95"
-          aria-label="Open menu"
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 ${
+            showSidebar
+              ? 'border-lime-300/50 bg-lime-300/10 text-lime-300'
+              : 'border-white/10 text-zinc-400 hover:bg-white/5 hover:text-white'
+          }`}
+          aria-label="Toggle Chat"
         >
-          <Menu className="h-5 w-5" />
+          <MessageCircle className={`h-4 w-4 ${showSidebar ? 'text-lime-300' : ''}`} />
+          <span className="hidden sm:inline">Chat</span>
         </button>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-black uppercase tracking-[0.3em] text-lime-300">Voix</span>
+        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
+          {isActive ? (
+            <div className="flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-1.5">
+              <span className="flex items-end gap-[2px] h-3">
+                {speakerBands.slice(0, 5).map((level, i) => (
+                  <span
+                    key={i}
+                    className="w-[3px] rounded-full bg-lime-300"
+                    style={{
+                      height: `${Math.max(3, Math.round(level * 14))}px`,
+                      opacity: 0.4 + level * 0.6,
+                    }}
+                  />
+                ))}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-lime-300">Active</span>
+              <span className="font-mono text-[9px] text-lime-300/70">
+                {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(Math.floor(sessionElapsed % 60)).padStart(2, '0')}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+              <span className="font-mono text-[12px] tracking-widest text-zinc-500">။‖‖‖။</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Inactive</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={startSession}
-            disabled={isActive || connecting}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-lime-300/20 bg-lime-300/5 text-lime-300 transition hover:border-lime-300/40 hover:bg-lime-300/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Voice mode"
-          >
-            <Radio className="h-4 w-4" />
-          </button>
-
-          <button
-            onClick={() => setShowProfile(true)}
-            className="h-9 w-9 overflow-hidden rounded-full border border-white/10 transition-all hover:border-white/30 active:scale-95"
-          >
-            {settings.avatarUrl || user.photoURL ? (
-              <img src={settings.avatarUrl || user.photoURL || ''} alt="Profile" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-[10px] font-bold text-zinc-400">
-                {settings.userName?.[0] || 'U'}
-              </div>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowProfile(true)}
+          className="h-10 w-10 overflow-hidden rounded-full border border-white/10 transition-all hover:border-lime-300/50 focus:outline-none focus:ring-2 focus:ring-lime-300/50 active:scale-95"
+        >
+          {settings.avatarUrl || user.photoURL ? (
+            <img src={settings.avatarUrl || user.photoURL || ''} alt="Profile" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-zinc-800 font-bold text-zinc-400">
+              {settings.userName?.[0] || 'U'}
+            </div>
+          )}
+        </button>
       </header>
 
       {!isVideoEnabled && (
@@ -4078,78 +4005,177 @@ Tasks:
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed inset-0 z-[101] flex w-full flex-col bg-[#0A0A0B] shadow-2xl"
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 pt-[max(12px,env(safe-area-inset-top))]">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#0A0A0B]/95 px-4 py-3 backdrop-blur-xl pt-[max(12px,env(safe-area-inset-top))]">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4 text-lime-300" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white">Chats</span>
+                </div>
+                {isActive && (
+                  <div className="flex items-center gap-2 rounded-full border border-lime-300/30 bg-lime-300/10 px-3 py-1">
+                    <span className="font-mono text-[10px] tracking-widest text-lime-300">။‖‖‖။</span>
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-lime-300">Voice Active</span>
+                    <span className="font-mono text-[8px] text-lime-300/70">
+                      {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(sessionElapsed % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={() => setShowSidebar(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 text-zinc-400 transition hover:border-white/30 hover:text-white"
-                  aria-label="Close menu"
+                  className="-mr-2 rounded-xl p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white"
+                  aria-label="Close Sidebar"
                 >
                   <X className="h-4 w-4" />
                 </button>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-black uppercase tracking-[0.25em] text-lime-300">Voix</span>
-                </div>
-                <div className="w-9" />
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col pb-[max(16px,env(safe-area-inset-bottom))]">
-                <div className="px-4 py-3">
-                  <button
-                    onClick={() => {
-                      setShowSidebar(false);
-                      setHistoryMsgs([]);
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-lime-300 transition hover:bg-lime-300/20 active:scale-98"
-                  >
-                    <Plus className="h-4 w-4" /> New Chat
-                  </button>
-                </div>
+                <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-3">
+                  {historyMsgs.map((msg, i) => (
+                    <div
+                      key={`${msg.timestamp}-${i}`}
+                      className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                    >
+                      <span className="mb-1 text-[8px] uppercase tracking-widest text-zinc-600">
+                        {msg.role === 'user' ? settings.userName : settings.agentName}
+                      </span>
 
-                <div className="flex flex-col gap-1 px-4">
-                  <div className="mb-2 text-[8px] font-bold uppercase tracking-widest text-zinc-600">History</div>
-                  {historyMsgs.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-8 text-center">
-                      <MessageCircle className="h-8 w-8 text-zinc-700" />
-                      <p className="text-[10px] text-zinc-600">No conversations yet</p>
+                      <div
+                        className={`max-w-[92%] rounded-2xl p-3 text-xs leading-relaxed overflow-hidden break-words whitespace-pre-wrap ${
+                          msg.role === 'user'
+                            ? 'rounded-tr-sm border border-sky-400/20 bg-sky-400/10 text-sky-100'
+                            : 'rounded-tl-sm border border-lime-300/10 bg-white/5 text-zinc-300'
+                        }`}
+                      >
+                        
+                        {msg.fileDataUrl && (
+                          <div className="mb-2 flex w-full justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                            <img 
+                              src={msg.fileDataUrl} 
+                              alt="Preview" 
+                              className="max-h-48 w-auto object-contain" 
+                            />
+                          </div>
+                        )}
+                        
+                        {msg.fileName && ( 
+                          <div className="mb-2 flex items-center gap-2 rounded-xl bg-black/30 px-2 py-1 text-[10px] text-lime-200">
+                            <Upload className="h-3 w-3" />
+                            {msg.fileName}
+                          </div> 
+                        )}
+                        
+                         {msg.toolName && ( 
+                           <div className="mb-2 flex items-center gap-2 rounded-xl bg-lime-300/10 px-2 py-1 text-[10px] text-lime-200">
+                             <FileText className="h-3 w-3" />
+                             Tool Output: {msg.toolName}
+                           </div> 
+                         )}
+                         
+{msg.videoUrl && (
+                            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black">
+                              <video
+                                src={msg.videoUrl}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                controls
+                                className="w-full object-contain"
+                                style={{ maxHeight: '320px' }}
+                              />
+                              <div className="flex items-center justify-between border-t border-white/10 bg-white/5 px-4 py-3">
+                                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-lime-300">
+                                  <Video className="h-4 w-4" /> Video Generated
+                                </div>
+                                <a
+                                  href={msg.videoUrl}
+                                  download
+                                  className="flex items-center gap-2 rounded-lg bg-lime-300/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-lime-300 transition hover:bg-lime-300/20"
+                                >
+                                  <Download className="h-3.5 w-3.5" /> Download
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                         
+                         {msg.text}
+                         
+                         {msg.htmlPreviewData && msg.htmlPreviewFilename && (
+                          <div className="mt-3 grid grid-cols-1 gap-2">
+                            <a 
+                              href={msg.htmlPreviewData} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-lime-300/20 bg-lime-300/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-lime-200 transition hover:bg-lime-300/15"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" /> Open HTML Preview
+                            </a>
+                            <a 
+                              href={msg.htmlPreviewData} 
+                              download={msg.htmlPreviewFilename} 
+                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-200 transition hover:bg-white/10"
+                            >
+                              <Download className="h-3.5 w-3.5" /> Download HTML
+                            </a>
+                          </div>
+                        )}
+                        
+                        {msg.downloadData && msg.downloadFilename && ( 
+                          <a 
+                            href={msg.downloadData} 
+                            download={msg.downloadFilename} 
+                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-lime-300/20 bg-lime-300/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-lime-200 transition hover:bg-lime-300/15"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Download Result
+                          </a> 
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    historyMsgs
-                      .filter((m) => m.role === 'user')
-                      .slice(-10)
-                      .reverse()
-                      .map((msg, i) => (
-                        <button
-                          key={`${msg.timestamp}-${i}`}
-                          onClick={() => setShowSidebar(false)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-white/5 bg-white/5 px-3 py-2 text-left transition hover:border-lime-300/30 hover:bg-white/5"
-                        >
-                          <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-300">{msg.text}</span>
-                        </button>
-                      ))
+                  ))}
+                  
+                  {historyMsgs.length === 0 && (
+                    <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+                      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                        <MessageCircle className="h-8 w-8 text-zinc-600" />
+                      </div>
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">No messages yet</p>
+                      <p className="text-[10px] text-zinc-600">Start a conversation with {settings.agentName}</p>
+                    </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                <div className="mt-auto space-y-3 border-t border-white/5 px-4 pt-4">
-                  <button
-                    onClick={() => {
-                      setShowSidebar(false);
-                      startSession();
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-lime-300 transition hover:bg-lime-300/20"
-                  >
-                    <Radio className="h-4 w-4" /> Switch to Voice Mode
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSidebar(false);
-                      onLogout();
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition hover:border-white/20 hover:text-zinc-300"
-                  >
-                    <LogOut className="h-4 w-4" /> Sign Out
-                  </button>
-                </div>
+                <form
+                  onSubmit={sendChatMessage}
+                  className="border-t border-white/10 bg-[#070807]/95 p-3 backdrop-blur-xl"
+                >
+                  <div className="flex items-center gap-2 rounded-2xl border border-lime-300/15 bg-black/45 p-2 shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-400 transition hover:border-lime-300/30 hover:text-lime-200 active:scale-95"
+                      aria-label="Attach file"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </button>
+
+                    <input
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder={`Message ${settings.agentName}...`}
+                      className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-zinc-600"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-300 text-black transition hover:bg-lime-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Send message"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           </>
