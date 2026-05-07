@@ -3796,7 +3796,18 @@ Tasks:
         <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
           {isActive ? (
             <div className="flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-1.5">
-              <span className="font-mono text-[12px] tracking-widest text-lime-300">။‖‖‖။</span>
+              <span className="flex items-end gap-[2px] h-3">
+                {speakerBands.slice(0, 5).map((level, i) => (
+                  <span
+                    key={i}
+                    className="w-[3px] rounded-full bg-lime-300"
+                    style={{
+                      height: `${Math.max(3, Math.round(level * 14))}px`,
+                      opacity: 0.4 + level * 0.6,
+                    }}
+                  />
+                ))}
+              </span>
               <span className="text-[9px] font-bold uppercase tracking-widest text-lime-300">Active</span>
               <span className="font-mono text-[9px] text-lime-300/70">
                 {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(Math.floor(sessionElapsed % 60)).padStart(2, '0')}
