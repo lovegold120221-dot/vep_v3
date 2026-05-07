@@ -3820,11 +3820,20 @@ Tasks:
           <span className="hidden sm:inline">Chat</span>
         </button>
 
-        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center">
-          {showSidebar && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-              Chat
-            </span>
+        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
+          {isActive ? (
+            <div className="flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/5 px-4 py-1.5">
+              <span className="font-mono text-[12px] tracking-widest text-lime-300">။‖‖‖။</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-lime-300">Active</span>
+              <span className="font-mono text-[9px] text-lime-300/70">
+                {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(Math.floor(sessionElapsed % 60)).padStart(2, '0')}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5">
+              <span className="font-mono text-[12px] tracking-widest text-zinc-500">။‖‖‖။</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Inactive</span>
+            </div>
           )}
         </div>
 
@@ -3857,20 +3866,6 @@ Tasks:
             speakerLevel={speakerLevel}
             speakerBands={speakerBands}
           />
-
-          <div className="mt-6 flex items-center gap-3 rounded-full border border-lime-300/20 bg-lime-300/5 px-5 py-2">
-            <span className={`font-mono text-[14px] tracking-widest ${isActive ? 'text-lime-300' : 'text-zinc-500'}`}>
-              ။‖‖‖။
-            </span>
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-lime-300' : 'text-zinc-500'}`}>
-              {isActive ? 'Voice Active' : 'Inactive'}
-            </span>
-            {isActive && (
-              <span className="font-mono text-[10px] text-lime-300/70">
-                {String(Math.floor(sessionElapsed / 60)).padStart(2, '0')}:{String(sessionElapsed % 60).padStart(2, '0')}
-              </span>
-            )}
-          </div>
 
           <AnimatePresence>
             {currentTranscript && ( 
