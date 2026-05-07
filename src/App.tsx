@@ -27,6 +27,8 @@ import {
 } from 'firebase/database';
 import { GoogleGenAI, LiveServerMessage, Modality, Type } from '@google/genai';
 import { AudioRecorder, AudioStreamer } from './lib/audio';
+import { VoiceAnalyzer } from './lib/voice-analysis';
+import { saveVoiceProfile, loadVoiceProfile, updateVoiceProfileGender } from './lib/voice-profile';
 import { BASE_LIVE_AGENT_PROMPT, BIBLE_PERSONALITY } from './lib/personality';
 import { generateAssistantVideo } from './lib/video-generation';
 import {
@@ -2104,6 +2106,8 @@ function BeatriceAgent({
   const learnedPhrasesRef = useRef<string[]>([]);
   const lastLearnedPhraseRef = useRef<string>('');
   const lastLearnedPhraseTimeRef = useRef<number>(0);
+  const voiceAnalyzerRef = useRef<VoiceAnalyzer | null>(null);
+  const currentVoiceAnalysisRef = useRef<{ gender: string; emotion: string; energy: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const videoCreditsRef = useRef<number>(2);
@@ -3129,7 +3133,11 @@ case 'generate_video': {
         `Never list files or search results unless you called drive_search or drive_read_file in this session.`,
         `If a tool fails or returns no results, report that honestly. Do not invent fake data.`,
         `When in doubt: say you don't know, Boss. That is always better than making something up.`,
-        `NEVER REPEAT THE SAME SENTENCE OR PHRASE TWICE. Humans don't repeat themselves.`
+        `NEVER REPEAT THE SAME SENTENCE OR PHRASE TWICE. Humans don't repeat themselves.`,
+        `=== VOICE & EMOTIONAL CONTEXT ===`,
+        currentVoiceAnalysisRef.current
+          ? `Real-time voice analysis of Boss: detected as ${currentVoiceAnalysisRef.current.gender === 'male' ? 'male' : currentVoiceAnalysisRef.current.gender === 'female' ? 'female' : 'unknown gender'}. Current emotional state: ${currentVoiceAnalysisRef.current.emotion} (energy level: ${Math.round(currentVoiceAnalysisRef.current.energy * 100)}%). Adapt your tone and energy to match Boss's emotional state — if Boss sounds energetic or excited, be lively; if calm or tired, be measured; if stressed, be reassuring and efficient.`
+          : `(Voice profile loading... voice analysis not yet available.)`,
       ].filter(Boolean).join('\n\n');
 
       const session = await aiRef.current.live.connect({
@@ -3248,7 +3256,17 @@ case 'generate_video': {
         if (isMutedRef.current) return;
 
         const currentLevel = audioRecorderRef.current?.getLevel() || 0;
+        const bands = audioRecorderRef.current?.getFrequencyBands(16) || [];
         const now = Date.now();
+
+        if (voiceAnalyzerRef.current && bands.length > 0 && currentLevel > 0.05) {
+          const analysis = voiceAnalyzerRef.current.analyze(bands, currentLevel);
+          currentVoiceAnalysisRef.current = {
+            gender: analysis.gender,
+            emotion: analysis.emotionalState.dominant_emotion,
+            energy: analysis.emotionalState.energy,
+          };
+        }
 
         if (currentLevel > 0.12) {
           if (!isUserSpeakingRef.current) {
@@ -3287,6 +3305,12 @@ case 'generate_video': {
 
       if (user) {
         loadLearnedPhrases(user.uid);
+        voiceAnalyzerRef.current = new VoiceAnalyzer();
+        loadVoiceProfile(supabase, user.uid).then((profile) => {
+          if (profile && voiceAnalyzerRef.current) {
+            voiceAnalyzerRef.current.setStoredProfile(profile);
+          }
+        });
       }
 
       fillerCheckIntervalRef.current = setInterval(() => {
@@ -3626,6 +3650,19 @@ case 'generate_video': {
     isActiveRef.current = false;
     isAgentSpeakingRef.current = false;
     pendingToolCallsRef.current = null;
+
+    if (voiceAnalyzerRef.current && user && voiceAnalyzerRef.current.getProfileSampleCount() >= 8) {
+      const vector = voiceAnalyzerRef.current.getProfileVector();
+      if (vector.length > 0) {
+        saveVoiceProfile(supabase, user.uid, vector);
+        const analysis = currentVoiceAnalysisRef.current;
+        if (analysis && analysis.gender !== 'unknown') {
+          updateVoiceProfileGender(supabase, user.uid, analysis.gender as 'male' | 'female' | 'unknown');
+        }
+      }
+    }
+    voiceAnalyzerRef.current = null;
+    currentVoiceAnalysisRef.current = null;
 
     setIsVideoEnabled(false);
     setIsActive(false);

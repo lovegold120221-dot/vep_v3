@@ -111,7 +111,7 @@ export class AudioStreamer {
   getLevel() {
     if (!this.analyser || !this.timeData) return this.lastLevel;
 
-    this.analyser.getByteTimeDomainData(this.timeData);
+    this.analyser.getByteTimeDomainData(this.timeData as any);
     let sumSquares = 0;
 
     for (let i = 0; i < this.timeData.length; i++) {
@@ -127,7 +127,7 @@ export class AudioStreamer {
   getFrequencyBands(count = 20) {
     if (!this.analyser || !this.frequencyData) return [];
 
-    this.analyser.getByteFrequencyData(this.frequencyData);
+    this.analyser.getByteFrequencyData(this.frequencyData as any);
     const bandCount = Math.max(1, Math.min(count, this.frequencyData.length));
     const usableBins = Math.max(bandCount, Math.floor(this.frequencyData.length * 0.72));
     const binSize = Math.max(1, Math.floor(usableBins / bandCount));
@@ -213,7 +213,7 @@ export class AudioRecorder {
   getFrequencyBands(count = 16) {
     if (!this.analyser || !this.frequencyData) return [];
 
-    this.analyser.getByteFrequencyData(this.frequencyData);
+    this.analyser.getByteFrequencyData(this.frequencyData as any);
     const bandCount = Math.max(1, Math.min(count, this.frequencyData.length));
     const binSize = Math.max(1, Math.floor(this.frequencyData.length / bandCount));
 
